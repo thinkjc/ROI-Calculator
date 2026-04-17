@@ -1,5 +1,7 @@
-import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
 import type { Request, Response } from 'express';
+
+const redis = Redis.fromEnv();
 
 export default async function handler(req: Request, res: Response) {
   if (req.method !== 'GET') {
@@ -8,7 +10,7 @@ export default async function handler(req: Request, res: Response) {
   const id = (req.query as Record<string, string>).id;
   if (!id) return res.status(400).json({ error: 'Missing ID' });
   try {
-    const data = await kv.get(id);
+    const data = await redis.get(id);
     if (!data) return res.status(404).json({ error: 'Not found' });
     return res.status(200).json(data);
   } catch (err) {
