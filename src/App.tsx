@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import {
   LayoutDashboard, ShieldCheck, Award, UserMinus, Users,
   TrendingUp, Search, Headphones, Monitor, ChevronRight,
-  Menu, X, FileDown
+  Menu, X, FileDown, Share2
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -357,6 +357,7 @@ export default function App() {
   const [globalValues, setGlobalValues] = useState({});
   const [currency, setCurrency] = useState(CURRENCIES[0]);
   const [subCost, setSubCost] = useState(0);
+  const [shareStatus, setShareStatus] = useState<'idle' | 'saving' | 'copied' | 'error'>('idle');
 
   const handleValueChange = (cardId, inputId, value) => {
     setGlobalValues(prev => ({ ...prev, [cardId]: { ...(prev[cardId]||{}), [inputId]: value } }));
@@ -403,6 +404,41 @@ export default function App() {
     });
     return () => obs.disconnect();
   }, []);
+
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('s');
+    if (!id) return;
+    fetch(`/api/load/${id}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.globalValues) setGlobalValues(data.globalValues);
+        if (data.currency) {
+          const c = CURRENCIES.find(x => x.code === data.currency.code);
+          if (c) setCurrency(c);
+        }
+        if (typeof data.subCost === 'number') setSubCost(data.subCost);
+      })
+      .catch(console.error);
+  }, []);
+
+  const shareScenario = async () => {
+    setShareStatus('saving');
+    try {
+      const res = await fetch('/api/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ globalValues, currency, subCost }),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      const { id } = await res.json();
+      await navigator.clipboard.writeText(`${window.location.origin}/s/${id}`);
+      setShareStatus('copied');
+      setTimeout(() => setShareStatus('idle'), 3000);
+    } catch {
+      setShareStatus('error');
+      setTimeout(() => setShareStatus('idle'), 3000);
+    }
+  };
 
   const sym = currency.symbol;
 
@@ -465,6 +501,11 @@ export default function App() {
               {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.symbol} - {c.label}</option>)}
             </select>
             <p style={{ fontSize:10, color:"#94a3b8", marginTop:8, fontWeight:600, textTransform:"uppercase", letterSpacing:0.5 }}>Calculations are estimates.</p>
+            <button onClick={shareScenario} disabled={shareStatus === 'saving'}
+              style={{ marginTop:12, width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:8, padding:"9px 12px", background: shareStatus === 'copied' ? "#059669" : shareStatus === 'error' ? "#f43f5e" : "#0f172a", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor: shareStatus === 'saving' ? "wait" : "pointer", transition:"background 0.2s" }}>
+              <Share2 size={14}/>
+              {shareStatus === 'saving' ? 'Saving…' : shareStatus === 'copied' ? 'Copied!' : shareStatus === 'error' ? 'Error' : 'Share Scenario'}
+            </button>
           </div>
         </aside>
 
