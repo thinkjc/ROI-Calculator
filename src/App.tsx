@@ -1,13 +1,15 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   LayoutDashboard, ShieldCheck, Award, UserMinus, Users,
   TrendingUp, Search, Headphones, Monitor, ChevronRight,
-  Menu, X, FileDown, Share2
+  Menu, X, Share2
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell
 } from "recharts";
+import { getClient, localise } from "./clients";
+import type { ClientConfig } from "./clients";
 
 const CURRENCIES = [
   { code: "EUR", symbol: "€", label: "Euro" },
@@ -16,11 +18,11 @@ const CURRENCIES = [
   { code: "JPY", symbol: "¥", label: "Japanese Yen" },
 ];
 
-function ROICard({ id, title, problem, solution, inputs, calculate, icon, accentColor, values, onValueChange, currencySymbol }) {
+function ROICard({ title, problem, solution, inputs, calculate, icon, accentColor, values, onValueChange, currencySymbol, formula, locale = 'en-GB' }: { title: any; problem: any; solution: any; inputs: any; calculate: any; icon: any; accentColor: any; values: any; onValueChange: any; currencySymbol: any; formula: any; locale?: 'en-GB' | 'en-US' }) {
   const result = useMemo(() => calculate(values), [values, calculate]);
   const fmt = (v) => v.toLocaleString("en-US");
   const parse = (s) => Number(s.replace(/[^0-9.-]+/g, ""));
-  const progress = (inp, val) => ((val - inp.min) / (inp.max - inp.min)) * 100;
+  const progress = (inp, val) => Math.max(0, Math.min(100, ((val - inp.min) / (inp.max - inp.min)) * 100));
 
   return (
     <div className="card">
@@ -34,18 +36,18 @@ function ROICard({ id, title, problem, solution, inputs, calculate, icon, accent
       <h3 style={{ fontSize:16, fontWeight:700, color:"#0f172a", marginBottom:8 }}>{title}</h3>
       <div style={{ marginBottom:16, flexGrow:1 }}>
         <div style={{ marginBottom:8 }}>
-          <span style={{ fontSize:11, fontWeight:800, color:"#334155", textTransform:"uppercase", letterSpacing:0.5 }}>Problem</span>
-          <p style={{ fontSize:13, color:"#475569", lineHeight:1.6, margin:"4px 0 0" }}>{problem}</p>
+          <span style={{ fontSize:11, fontWeight:800, color:"#334155", textTransform:"uppercase", letterSpacing:0.5 }}>Challenge</span>
+          <p style={{ fontSize:13, color:"#475569", lineHeight:1.6, margin:"4px 0 0" }}>{localise(problem, locale)}</p>
         </div>
         <div>
-          <span style={{ fontSize:11, fontWeight:800, color:"#334155", textTransform:"uppercase", letterSpacing:0.5 }}>Our Solution</span>
-          <p style={{ fontSize:13, color:"#475569", lineHeight:1.6, margin:"4px 0 0" }}>{solution}</p>
+          <span style={{ fontSize:11, fontWeight:800, color:"#334155", textTransform:"uppercase", letterSpacing:0.5 }}>How it works</span>
+          <p style={{ fontSize:13, color:"#475569", lineHeight:1.6, margin:"4px 0 0" }}>{localise(solution, locale)}</p>
         </div>
       </div>
       <div style={{ borderTop:"1px solid #f1f5f9", paddingTop:16 }}>
         {inputs.map(inp => (
           <div key={inp.id} style={{ marginBottom:16 }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:2 }}>
               <label style={{ fontSize:12, fontWeight:700, color:"#0f172a" }}>{inp.label}</label>
               <div style={{ display:"flex", alignItems:"center", gap:6 }}>
                 <input
@@ -54,9 +56,14 @@ function ROICard({ id, title, problem, solution, inputs, calculate, icon, accent
                   onChange={e => { const n = parse(e.target.value); if (!isNaN(n)) onValueChange(inp.id, n); }}
                   style={{ width:88, padding:"4px 8px", textAlign:"right", fontSize:13, fontWeight:700, color:"#0f172a", border:"1px solid #cbd5e1", borderRadius:6, outline:"none" }}
                 />
-                <span style={{ fontSize:12, color:"#64748b", minWidth:20 }}>{inp.unit === "$" ? currencySymbol : inp.unit}</span>
+                <span style={{ fontSize:12, color:"#64748b", minWidth:20 }}>
+                  {inp.unit === "$" || inp.unit === "€" || inp.unit === "£" ? currencySymbol : inp.unit}
+                </span>
               </div>
             </div>
+            {inp.guidance && (
+              <p style={{ fontSize:11, color:"#94a3b8", margin:"0 0 6px", lineHeight:1.5 }}>{inp.guidance}</p>
+            )}
             <input
               type="range" min={inp.min} max={inp.max} step={inp.step}
               value={values[inp.id] ?? inp.defaultValue}
@@ -69,283 +76,399 @@ function ROICard({ id, title, problem, solution, inputs, calculate, icon, accent
           </div>
         ))}
       </div>
+      {formula && (
+        <div style={{ borderTop:"1px solid #f1f5f9", paddingTop:10, marginTop:4 }}>
+          <div style={{ fontSize:10, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:0.5, marginBottom:3 }}>How we calculated this</div>
+          <p style={{ fontSize:11, color:"#94a3b8", margin:0, lineHeight:1.6 }}>{formula}</p>
+        </div>
+      )}
     </div>
   );
 }
 
 const SECTIONS = [
   {
-    id:"product-feedback", title:"Product Feedback", description:"Accelerate your roadmap by identifying high-impact features faster.",
+    id:"product-feedback", title:"Product Feedback",
+    description:"Accelerate your roadmap by identifying high-impact features from across your operating companies.",
     icon:<LayoutDashboard size={18} color="#6366f1"/>, accentColor:"#6366f1",
     cards:[
-      { id:"roadmap-prioritization", title:"Roadmap Prioritization",
-        problem:"Product teams spend 20 hours/month manually tagging feedback.",
-        solution:"Automated tagging from The Answer Layer reduces manual effort by 90%.",
+      {
+        id:"roadmap-prioritisation", title:"Roadmap Prioritisation",
+        problem:"Product managers across your operating companies spend significant time manually reviewing and tagging interaction data to identify feature requests and recurring themes — work that scales poorly as interaction volumes grow.",
+        solution:"The platform automatically categorises recurring themes from interactions across all supported markets, surfacing product signals that would otherwise be buried in volume and reducing the manual effort required to identify genuine priorities.",
         icon:<LayoutDashboard size={20} color="#6366f1"/>,
         inputs:[
-          { id:"pmCount", label:"Number of Product Managers", min:1, max:100, step:1, unit:"", defaultValue:5 },
-          { id:"hourlyRate", label:"Product Manager Annual Loaded Cost", min:50000, max:500000, step:5000, unit:"$", defaultValue:200000 }
+          { id:"pmCount", label:"Number of Product Managers", min:1, max:100, step:1, unit:"", defaultValue:0,
+            guidance:"Total product managers across your operating companies" },
+          { id:"hourlyRate", label:"Annual Loaded Cost per PM", min:50000, max:500000, step:5000, unit:"$", defaultValue:0,
+            guidance:"Include salary, benefits and on-costs" }
         ],
-        calculate:v => ((v.pmCount||5)*20*0.9*((v.hourlyRate||200000)/2000)*12)*3
+        calculate:v => ((v.pmCount||0)*20*0.9*((v.hourlyRate||0)/2000)*12)*3,
+        formula:"Product managers × 20 hrs/month × 90% efficiency gain × hourly rate × 12 months × 3 years"
       },
-      { id:"customer-centric-building", title:"Value of Building what your customers want",
-        problem:"Roadmap waste: 25% of features built are rarely used due to poor signal-to-noise in feedback.",
-        solution:"Sentiment and request clustering from The Answer Layer ensures 40% better roadmap alignment.",
+      {
+        id:"customer-centric-building", title:"Customer-Centric Product Development",
+        problem:"Without reliable signal on which features operating company customers actually use and value, development resource is spread across low-impact work — a structural inefficiency that compounds over planning cycles.",
+        solution:"Sentiment clustering and request analysis across interaction data gives product teams a clear view of genuine customer priorities, improving alignment between development investment and measurable customer value.",
         icon:<LayoutDashboard size={20} color="#6366f1"/>,
         inputs:[
-          { id:"devTeamSize", label:"Dev Team Size", min:5, max:500, step:5, unit:"", defaultValue:50 },
-          { id:"avgDevSalary", label:"Avg Dev Annual Loaded Cost", min:80000, max:250000, step:5000, unit:"$", defaultValue:120000 },
-          { id:"alignmentImprovement", label:"Alignment Improvement", min:5, max:50, step:5, unit:"%", defaultValue:20 }
+          { id:"devTeamSize", label:"Development Team Size", min:5, max:500, step:5, unit:"", defaultValue:0,
+            guidance:"Total developers across all product teams" },
+          { id:"avgDevSalary", label:"Average Annual Loaded Cost per Dev", min:80000, max:250000, step:5000, unit:"$", defaultValue:0,
+            guidance:"Include salary, benefits and on-costs" },
+          { id:"alignmentImprovement", label:"Roadmap Alignment Improvement", min:5, max:50, step:5, unit:"%", defaultValue:0,
+            guidance:"Estimated improvement in alignment between development investment and customer-valued features" }
         ],
-        calculate:v => ((v.devTeamSize||50)*(v.avgDevSalary||120000)*0.25*((v.alignmentImprovement||20)/100))*3
+        calculate:v => ((v.devTeamSize||0)*(v.avgDevSalary||0)*0.25*((v.alignmentImprovement||0)/100))*3,
+        formula:"Dev team size × average dev cost × 25% roadmap waste factor × alignment improvement % × 3 years"
       }
     ]
   },
   {
-    id:"compliance", title:"Compliance", description:"Mitigate risk and automate regulatory monitoring.",
+    id:"compliance", title:"Compliance",
+    description:"Maintain regulatory confidence across every market your shared service centres support.",
     icon:<ShieldCheck size={18} color="#10b981"/>, accentColor:"#10b981",
     cards:[
-      { id:"regulatory-fine-avoidance", title:"Regulatory Fine Avoidance",
-        problem:"Customer conversations often contain regulated statements (GDPR, financial disclosures, etc.). Detecting issues early reduces the likelihood of regulatory penalties.",
-        solution:"Our compliance engine, powered by The Answer Layer, detects regulated statements in real-time, allowing for immediate intervention and reducing the probability of costly incidents.",
+      {
+        id:"regulatory-confidence", title:"Regulatory Confidence",
+        problem:"Agents supporting multiple markets cannot reasonably hold every regulatory nuance in their heads, particularly as rules evolve across jurisdictions. Regulatory risk accumulates not through negligence, but through the inherent limits of human recall at scale.",
+        solution:"The platform monitors live interactions for signals that indicate potential regulatory misalignment — flagging phrases, commitments, or omissions that a human agent would not connect to a regulatory requirement — and prompts agents in real time so the organisation stays aligned across every market.",
         icon:<ShieldCheck size={20} color="#10b981"/>,
         inputs:[
-          { id:"regulatedInteractions", label:"Regulated Interactions / Year", min:100000, max:500000000, step:100000, unit:"", defaultValue:100000000 },
-          { id:"incidentProb", label:"Incident Probability", min:0.0001, max:0.1, step:0.0001, unit:"%", defaultValue:0.005 },
-          { id:"avgFine", label:"Avg. Fine Exposure", min:100, max:10000000, step:100, unit:"€", defaultValue:1000 },
-          { id:"riskReduction", label:"Risk Reduction with The Answer Layer", min:5, max:50, step:5, unit:"%", defaultValue:10 }
+          { id:"regulatedInteractions", label:"Regulated Interactions / Year", min:100000, max:500000000, step:100000, unit:"", defaultValue:0,
+            guidance:"Total regulated interactions across all supported markets annually" },
+          { id:"incidentProb", label:"Incident Probability", min:0.0001, max:0.1, step:0.0001, unit:"%", defaultValue:0,
+            guidance:"Estimated probability of a regulatory incident per interaction" },
+          { id:"avgFine", label:"Average Regulatory Cost", min:100, max:10000000, step:100, unit:"€", defaultValue:0,
+            guidance:"Average cost of a regulatory incident, including fines and remediation" },
+          { id:"riskReduction", label:"Risk Reduction", min:5, max:50, step:5, unit:"%", defaultValue:0,
+            guidance:"Estimated reduction in incident probability through real-time monitoring" }
         ],
-        calculate:v => ((v.regulatedInteractions||100000000)*((v.incidentProb||0.005)/100)*(v.avgFine||1000)*((v.riskReduction||10)/100))*3
+        calculate:v => ((v.regulatedInteractions||0)*((v.incidentProb||0)/100)*(v.avgFine||0)*((v.riskReduction||0)/100))*3,
+        formula:"Regulated interactions × incident probability × average regulatory cost × risk reduction % × 3 years"
       },
-      { id:"reduced-compliance-review-labor", title:"Reduced Compliance Review Labor",
-        problem:"Compliance teams manually audit customer interactions to ensure regulatory adherence, which is slow and expensive.",
-        solution:"Analysis from The Answer Layer dramatically reduces the amount of human review required by pre-screening and prioritizing interactions.",
+      {
+        id:"compliance-review-efficiency", title:"Compliance Review Efficiency",
+        problem:"Compliance teams manually audit a fraction of total interactions to verify regulatory adherence — a process that is resource-intensive, inconsistent, and unable to scale with growing interaction volumes across markets.",
+        solution:"Automated pre-screening prioritises the interactions most likely to require human review, enabling compliance analysts to focus their time where it matters and increasing the coverage achievable within existing resource.",
         icon:<ShieldCheck size={20} color="#10b981"/>,
         inputs:[
-          { id:"interactionsAudited", label:"Interactions Audited / Year", min:10000, max:5000000, step:10000, unit:"", defaultValue:250000 },
-          { id:"reviewTime", label:"Avg. Review Time", min:1, max:60, step:1, unit:"min", defaultValue:8 },
-          { id:"analystCost", label:"Analyst Annual Loaded Cost", min:40000, max:400000, step:5000, unit:"$", defaultValue:120000 },
-          { id:"reviewReduction", label:"Manual Review Reduction", min:5, max:90, step:5, unit:"%", defaultValue:40 }
+          { id:"interactionsAudited", label:"Interactions Audited / Year", min:10000, max:5000000, step:10000, unit:"", defaultValue:0,
+            guidance:"Total interactions manually reviewed by compliance teams annually" },
+          { id:"reviewTime", label:"Average Review Time", min:1, max:60, step:1, unit:"min", defaultValue:0,
+            guidance:"Average time a compliance analyst spends per interaction" },
+          { id:"analystCost", label:"Analyst Annual Loaded Cost", min:40000, max:400000, step:5000, unit:"$", defaultValue:0,
+            guidance:"Include salary, benefits and on-costs" },
+          { id:"reviewReduction", label:"Manual Review Reduction", min:5, max:90, step:5, unit:"%", defaultValue:0,
+            guidance:"Estimated reduction in manual review requirement through automated pre-screening" }
         ],
-        calculate:v => ((v.interactionsAudited||250000)*((v.reviewTime||8)/60)*((v.analystCost||120000)/2000)*((v.reviewReduction||40)/100))*3
+        calculate:v => ((v.interactionsAudited||0)*((v.reviewTime||0)/60)*((v.analystCost||0)/2000)*((v.reviewReduction||0)/100))*3,
+        formula:"Interactions audited × review time (hrs) × analyst hourly rate × manual review reduction % × 3 years"
       }
     ]
   },
   {
-    id:"brand", title:"Brand", description:"Protect your reputation and track sentiment across all channels.",
+    id:"brand", title:"Brand",
+    description:"Protect your reputation and maintain service consistency across all channels and markets.",
     icon:<Award size={18} color="#f59e0b"/>, accentColor:"#f59e0b",
     cards:[
-      { id:"reduced-public-complaints", title:"Reduced Public Complaints / Social Escalations",
-        problem:"Negative customer experiences that escalate to public channels (social media, regulatory complaints, press coverage) damage brand perception.",
-        solution:"Detecting systemic issues earlier reduces these incidents and the associated reputational risk.",
+      {
+        id:"reduced-service-escalations", title:"Reduced Service Escalations",
+        problem:"Customer experience issues that reach public channels — social media, press, regulatory bodies — create reputational exposure that is disproportionate to the original service failure. By the time these escalations surface, the window to intervene has closed.",
+        solution:"By identifying patterns in interaction data before they become systemic, operating companies can address root causes earlier, reducing the volume of issues that escalate beyond the service relationship.",
         icon:<Award size={20} color="#f59e0b"/>,
         inputs:[
-          { id:"complaintCount", label:"Public complaints or social escalations annually", min:1000, max:1000000, step:1000, unit:"", defaultValue:10000 },
-          { id:"costPerComplaint", label:"Estimated cost per incident", min:10, max:5000, step:10, unit:"€", defaultValue:220 },
-          { id:"reduction", label:"Reduction from real-time flagging and escalation", min:5, max:50, step:5, unit:"%", defaultValue:20 }
+          { id:"complaintCount", label:"Public Escalations Annually", min:1000, max:1000000, step:1000, unit:"", defaultValue:0,
+            guidance:"Public complaints or social escalations per year across all markets" },
+          { id:"costPerComplaint", label:"Estimated Cost per Incident", min:10, max:5000, step:10, unit:"€", defaultValue:0,
+            guidance:"Include agent time, management escalation and remediation costs" },
+          { id:"reduction", label:"Reduction from Earlier Detection", min:5, max:50, step:5, unit:"%", defaultValue:0,
+            guidance:"Estimated reduction through earlier identification and intervention" }
         ],
-        calculate:v => ((v.complaintCount||10000)*(v.costPerComplaint||220)*((v.reduction||20)/100))*3
+        calculate:v => ((v.complaintCount||0)*(v.costPerComplaint||0)*((v.reduction||0)/100))*3,
+        formula:"Annual escalations × cost per incident × reduction % × 3 years"
       },
-      { id:"avoided-brand-damage", title:"Avoided Brand Damage from Large-Scale Customer Issues",
-        problem:"When systemic issues go unnoticed, they can trigger large-scale reputation damage (media coverage, regulatory attention, customer backlash).",
-        solution:"Early detection prevents these events from escalating into high-impact brand crises.",
+      {
+        id:"sustained-brand-confidence", title:"Sustained Brand Confidence",
+        problem:"When systemic service issues go undetected across high-volume interaction channels, they can compound into significant reputation events — attracting media coverage, regulatory attention, or sustained customer backlash across multiple markets.",
+        solution:"Early detection of emerging patterns gives leadership teams the information they need to act before an issue reaches critical mass, maintaining the consistency of service that underpins long-term brand trust.",
         icon:<Award size={20} color="#f59e0b"/>,
         inputs:[
-          { id:"incidentCount", label:"Potential brand-impacting incidents per year", min:1, max:100, step:1, unit:"", defaultValue:8 },
-          { id:"costPerIncident", label:"Estimated cost per incident", min:10000, max:10000000, step:10000, unit:"€", defaultValue:600000 },
-          { id:"preventionRate", label:"% prevented through earlier detection", min:5, max:80, step:5, unit:"%", defaultValue:30 }
+          { id:"incidentCount", label:"Potential Brand-Impacting Incidents / Year", min:1, max:100, step:1, unit:"", defaultValue:0,
+            guidance:"Estimated incidents per year that could escalate to brand level" },
+          { id:"costPerIncident", label:"Estimated Cost per Incident", min:10000, max:10000000, step:10000, unit:"€", defaultValue:0,
+            guidance:"Include direct costs, remediation and estimated reputational impact" },
+          { id:"preventionRate", label:"Prevention Rate", min:5, max:80, step:5, unit:"%", defaultValue:0,
+            guidance:"Estimated % of incidents prevented through earlier detection" }
         ],
-        calculate:v => ((v.incidentCount||8)*(v.costPerIncident||600000)*((v.preventionRate||30)/100))*3
+        calculate:v => ((v.incidentCount||0)*(v.costPerIncident||0)*((v.preventionRate||0)/100))*3,
+        formula:"Potential incidents per year × cost per incident × prevention rate % × 3 years"
       },
-      { id:"nps-improvement-roi", title:"NPS Improvement",
-        problem:"Unresolved systemic customer experience issues suppress Net Promoter Scores, leading to stagnant customer advocacy and significant missed referral revenue.",
-        solution:"The Answer Layer identifies the root causes of systemic customer friction across all channels, providing actionable insights to resolve issues before they impact brand perception.",
+      {
+        id:"nps-improvement-roi", title:"NPS Improvement",
+        problem:"Recurring friction in the customer experience suppresses satisfaction scores and reduces the likelihood of organic advocacy — a measurable drag on growth that is difficult to address without visibility into its root causes across operating companies.",
+        solution:"The platform surfaces the specific interaction patterns and service gaps driving dissatisfaction, giving operating companies a prioritised view of where experience improvements will have the greatest impact on NPS and downstream referral behaviour.",
         icon:<Award size={20} color="#f59e0b"/>,
         inputs:[
-          { id:"totalCustomerBase", label:"Total customer base", min:1000000, max:100000000, step:1000000, unit:"", defaultValue:10000000 },
-          { id:"npsImprovement", label:"NPS improvement from improved experience", min:0.5, max:10, step:0.5, unit:"", defaultValue:1 },
-          { id:"referralRatePerPoint", label:"% additional referral rate per NPS point", min:0.01, max:2, step:0.01, unit:"%", defaultValue:0.01 },
-          { id:"avgNewCustomerValue", label:"Average value of a new customer", min:50, max:2000, step:50, unit:"€", defaultValue:350 }
+          { id:"totalCustomerBase", label:"Total Customer Base", min:1000000, max:100000000, step:1000000, unit:"", defaultValue:0,
+            guidance:"Total customers across all operating companies" },
+          { id:"npsImprovement", label:"NPS Improvement (points)", min:0.5, max:10, step:0.5, unit:"", defaultValue:0,
+            guidance:"Expected NPS point improvement from resolving root-cause experience issues" },
+          { id:"referralRatePerPoint", label:"Additional Referral Rate per NPS Point", min:0.01, max:2, step:0.01, unit:"%", defaultValue:0,
+            guidance:"Estimated % increase in referral rate per NPS point gained" },
+          { id:"avgNewCustomerValue", label:"Average Value of a New Customer", min:50, max:2000, step:50, unit:"€", defaultValue:0,
+            guidance:"Average first-year revenue value of a new customer" }
         ],
-        calculate:v => ((v.totalCustomerBase||10000000)*((v.npsImprovement||1)*((v.referralRatePerPoint||0.01)/100))*(v.avgNewCustomerValue||350))*3
+        calculate:v => ((v.totalCustomerBase||0)*((v.npsImprovement||0)*((v.referralRatePerPoint||0)/100))*(v.avgNewCustomerValue||0))*3,
+        formula:"Customer base × NPS improvement × referral rate per point % × average new customer value × 3 years"
       }
     ]
   },
   {
-    id:"churn-risk", title:"Churn Risk", description:"Identify at-risk customers before they leave.",
+    id:"churn-risk", title:"Customer Retention",
+    description:"Identify and retain at-risk customers before they disengage.",
     icon:<UserMinus size={18} color="#f43f5e"/>, accentColor:"#f43f5e",
     cards:[
-      { id:"prevented-customer-churn", title:"Prevented Customer Churn",
-        problem:"Early detection of dissatisfaction signals allows for intervention before customers cancel service.",
-        solution:"The Answer Layer identifies at-risk customers early, enabling proactive saving of individuals and signal for new programs targeted at saving larger groups.",
+      {
+        id:"retained-customer-value", title:"Retained Customer Value",
+        problem:"Dissatisfaction in the customer base accumulates gradually, and the signals are often visible in interaction data well before a customer takes action to leave. Without structured visibility across high interaction volumes, these signals go unacknowledged until it is too late to respond.",
+        solution:"The platform identifies patterns in interaction data that are statistically associated with elevated disengagement risk, enabling teams to prioritise outreach to the right customers at the right time — before the relationship deteriorates further.",
         icon:<UserMinus size={20} color="#f43f5e"/>,
         inputs:[
-          { id:"customersAtRisk", label:"Customers at Churn Risk", min:10000, max:2000000, step:10000, unit:"", defaultValue:150000 },
-          { id:"successRate", label:"Intervention Success Rate", min:1, max:50, step:1, unit:"%", defaultValue:12 },
-          { id:"clv", label:"Customer Lifetime Value", min:100, max:2000, step:50, unit:"$", defaultValue:450 }
+          { id:"customersAtRisk", label:"Customers at Retention Risk", min:10000, max:2000000, step:10000, unit:"", defaultValue:0,
+            guidance:"Estimated customers showing early disengagement signals annually" },
+          { id:"successRate", label:"Intervention Success Rate", min:1, max:50, step:1, unit:"%", defaultValue:0,
+            guidance:"% of at-risk customers retained through proactive intervention" },
+          { id:"clv", label:"Customer Lifetime Value", min:100, max:2000, step:50, unit:"$", defaultValue:0,
+            guidance:"Average lifetime value of a retained customer" }
         ],
-        calculate:v => ((v.customersAtRisk||150000)*((v.successRate||12)/100)*(v.clv||450))*3
+        calculate:v => ((v.customersAtRisk||0)*((v.successRate||0)/100)*(v.clv||0))*3,
+        formula:"Customers at risk × intervention success rate % × customer lifetime value × 3 years"
       },
-      { id:"reduced-reactive-retention-incentives", title:"Reduced Reactive Retention Incentives",
-        problem:"Without early detection, providers must offer expensive discounts or credits to retain customers who threaten to leave.",
-        solution:"Early intervention reduces the need for aggressive retention offers, lowering standard operating expenses.",
+      {
+        id:"reduced-reactive-retention-spend", title:"Reduced Reactive Retention Spend",
+        problem:"Retention offers made reactively — at the point a customer threatens to leave — are typically more expensive and less effective than proactive engagement earlier in the disengagement cycle.",
+        solution:"Earlier identification of at-risk customers allows retention teams to engage before the situation becomes critical, reducing reliance on costly last-resort incentives and improving the overall efficiency of retention spend.",
         icon:<UserMinus size={20} color="#f43f5e"/>,
         inputs:[
-          { id:"customersSaved", label:"Customers Saved Proactively", min:1000, max:500000, step:1000, unit:"", defaultValue:10000 },
-          { id:"avgIncentive", label:"Avg. Retention Incentive", min:10, max:500, step:10, unit:"$", defaultValue:80 }
+          { id:"customersSaved", label:"Customers Saved Proactively", min:1000, max:500000, step:1000, unit:"", defaultValue:0,
+            guidance:"Estimated customers retained through proactive rather than reactive intervention" },
+          { id:"avgIncentive", label:"Average Reactive Retention Incentive", min:10, max:500, step:10, unit:"$", defaultValue:0,
+            guidance:"Average cost of a reactive retention offer currently" }
         ],
-        calculate:v => ((v.customersSaved||10000)*(v.avgIncentive||80))*3
+        calculate:v => ((v.customersSaved||0)*(v.avgIncentive||0))*3,
+        formula:"Customers saved proactively × average retention incentive cost × 3 years"
       }
     ]
   },
   {
-    id:"competitive-intelligence", title:"Competitive Intelligence", description:"Stay ahead by monitoring competitor strengths, weaknesses, and market shifts.",
+    id:"competitive-intelligence", title:"Competitive Intelligence",
+    description:"Stay ahead by monitoring competitor activity and market shifts across your operating companies.",
     icon:<Users size={18} color="#3b82f6"/>, accentColor:"#3b82f6",
     cards:[
-      { id:"competitive-win-rate-improvement", title:"Competitive Win Rate Improvement",
-        problem:"Sales teams often lose deals because they lack real-time visibility into competitor strengths and specific objections raised by prospects.",
-        solution:"Competitive intelligence from The Answer Layer provides sales teams with the data they need to win more head-to-head deals.",
+      {
+        id:"competitive-win-rate-improvement", title:"Competitive Win Rate Improvement",
+        problem:"Sales teams across operating companies lose winnable deals because they lack timely, structured intelligence on the specific objections and competitor comparisons that arise in live prospect interactions.",
+        solution:"The platform surfaces competitive themes and objection patterns from interaction data, giving sales teams a continuously updated view of what prospects are comparing and where current positioning needs to be strengthened.",
         icon:<Users size={20} color="#3b82f6"/>,
         inputs:[
-          { id:"competitiveOpps", label:"Competitive sales opportunities", min:10000, max:1000000, step:10000, unit:"", defaultValue:400000 },
-          { id:"winRateInc", label:"Win-rate improvement", min:0.1, max:5, step:0.1, unit:"%", defaultValue:1 },
-          { id:"avgAnnualValue", label:"Avg. annual contract value", min:50, max:2000, step:50, unit:"$", defaultValue:320 }
+          { id:"competitiveOpps", label:"Competitive Sales Opportunities / Year", min:10000, max:1000000, step:10000, unit:"", defaultValue:0,
+            guidance:"Annual sales opportunities where competitive comparison is a factor" },
+          { id:"winRateInc", label:"Win Rate Improvement", min:0.1, max:5, step:0.1, unit:"%", defaultValue:0,
+            guidance:"Expected improvement in win rate from better competitive intelligence" },
+          { id:"avgAnnualValue", label:"Average Annual Contract Value", min:50, max:2000, step:50, unit:"$", defaultValue:0,
+            guidance:"Average first-year contract value of a won opportunity" }
         ],
-        calculate:v => ((v.competitiveOpps||400000)*((v.winRateInc||1)/100)*(v.avgAnnualValue||320))*3
+        calculate:v => ((v.competitiveOpps||0)*((v.winRateInc||0)/100)*(v.avgAnnualValue||0))*3,
+        formula:"Competitive opportunities × win rate improvement % × average contract value × 3 years"
       },
-      { id:"faster-competitive-offer-response", title:"Faster Competitive Offer Response",
-        problem:"When rivals launch aggressive new offers, slow internal response times lead to immediate market share erosion and customer churn.",
-        solution:"Real-time market monitoring ensures you can respond to competitive threats before they impact market share.",
+      {
+        id:"faster-competitive-response", title:"Faster Competitive Response",
+        problem:"When competing operators launch aggressive offers targeting your customer base, response time is critical. Delays in identifying the competitive pressure and co-ordinating a response across markets accelerate customer losses.",
+        solution:"Real-time monitoring of interaction patterns allows commercial teams to identify competitive pressure early — before it shows in churn data — enabling a faster, more co-ordinated response across affected markets.",
         icon:<Users size={20} color="#3b82f6"/>,
         inputs:[
-          { id:"targetedCustomers", label:"Customers targeted by competitors", min:10000, max:1000000, step:10000, unit:"", defaultValue:200000 },
-          { id:"arpu", label:"Avg. revenue per customer", min:100, max:2000, step:50, unit:"$", defaultValue:420 },
-          { id:"churnAvoidedComp", label:"Churn avoided via fast response", min:0.5, max:10, step:0.5, unit:"%", defaultValue:3 }
+          { id:"targetedCustomers", label:"Customers Targeted by Competitors", min:10000, max:1000000, step:10000, unit:"", defaultValue:0,
+            guidance:"Estimated customers actively targeted by competing operators annually" },
+          { id:"arpu", label:"Average Annual Revenue per Customer", min:100, max:2000, step:50, unit:"$", defaultValue:0,
+            guidance:"Average annual revenue per customer across your base" },
+          { id:"churnAvoidedComp", label:"Churn Avoided via Faster Response", min:0.5, max:10, step:0.5, unit:"%", defaultValue:0,
+            guidance:"% of targeted customers retained through earlier detection and response" }
         ],
-        calculate:v => ((v.targetedCustomers||200000)*(v.arpu||420)*((v.churnAvoidedComp||3)/100))*3
+        calculate:v => ((v.targetedCustomers||0)*(v.arpu||0)*((v.churnAvoidedComp||0)/100))*3,
+        formula:"Customers targeted × revenue per customer × churn avoided % × 3 years"
       }
     ]
   },
   {
-    id:"revenue-growth", title:"Revenue Growth", description:"Unlock expansion opportunities in your existing base.",
+    id:"revenue-growth", title:"Revenue Growth",
+    description:"Unlock expansion opportunities within your existing customer base.",
     icon:<TrendingUp size={18} color="#8b5cf6"/>, accentColor:"#8b5cf6",
     cards:[
-      { id:"upsell-cross-sell-conversion", title:"Upsell & Cross-Sell Conversion Improvement",
-        problem:"Massive amounts of expansion revenue are left on the table because high-intent signals buried in customer conversations are never identified or acted upon.",
-        solution:"Insights from The Answer Layer identify high-intent customers, allowing for targeted upsell campaigns that drive incremental revenue.",
+      {
+        id:"upsell-cross-sell-conversion", title:"Upsell & Cross-Sell Conversion",
+        problem:"Expansion signals exist in customer interaction data — customers expressing interest, asking about additional services, or describing needs that current products could address — but at scale, these signals are not consistently captured or acted upon.",
+        solution:"The platform identifies high-intent signals in interaction data and routes them to the relevant commercial teams, enabling targeted engagement that converts expressed customer interest into incremental revenue.",
         icon:<TrendingUp size={20} color="#8b5cf6"/>,
         inputs:[
-          { id:"eligibleCustomers", label:"Customers eligible for upsell", min:100000, max:10000000, step:100000, unit:"", defaultValue:3000000 },
-          { id:"conversionImprovement", label:"Conversion rate improvement", min:0.1, max:10, step:0.1, unit:"%", defaultValue:1.5 },
-          { id:"avgUpsellValue", label:"Average upsell value", min:10, max:500, step:5, unit:"$", defaultValue:90 }
+          { id:"eligibleCustomers", label:"Customers Eligible for Upsell", min:100000, max:10000000, step:100000, unit:"", defaultValue:0,
+            guidance:"Customers in your base who are eligible for upsell or cross-sell" },
+          { id:"conversionImprovement", label:"Conversion Rate Improvement", min:0.1, max:10, step:0.1, unit:"%", defaultValue:0,
+            guidance:"Expected improvement in conversion rate from better signal identification" },
+          { id:"avgUpsellValue", label:"Average Upsell Value", min:10, max:500, step:5, unit:"$", defaultValue:0,
+            guidance:"Average incremental revenue value per successful upsell" }
         ],
-        calculate:v => ((v.eligibleCustomers||3000000)*((v.conversionImprovement||1.5)/100)*(v.avgUpsellValue||90))*3
+        calculate:v => ((v.eligibleCustomers||0)*((v.conversionImprovement||0)/100)*(v.avgUpsellValue||0))*3,
+        formula:"Eligible customers × conversion rate improvement % × average upsell value × 3 years"
       },
-      { id:"sales-channel-conversion", title:"Conversion Rate Improvement in Sales Channels",
-        problem:"Sales conversion rates suffer when messaging and offers are based on guesswork rather than the actual pain points expressed by customers.",
-        solution:"Optimized sales messaging and offer targeting based on real customer feedback lead to higher conversion rates.",
+      {
+        id:"sales-channel-conversion", title:"Sales Channel Conversion Improvement",
+        problem:"Conversion rates in sales channels are constrained when messaging and offers are based on broad assumptions rather than the actual priorities and concerns that operating company customers express in their own interactions.",
+        solution:"Analysis of interaction patterns across markets enables commercial teams to align messaging and offers with what customers are actually asking for, improving conversion without increasing acquisition spend.",
         icon:<TrendingUp size={20} color="#8b5cf6"/>,
         inputs:[
-          { id:"salesLeads", label:"Number of sales leads", min:100000, max:5000000, step:100000, unit:"", defaultValue:2000000 },
-          { id:"salesConversionImprovement", label:"Conversion improvement", min:0.1, max:5, step:0.1, unit:"%", defaultValue:0.5 },
-          { id:"avgCustomerValue", label:"Avg. value of new customer", min:50, max:2000, step:50, unit:"$", defaultValue:400 }
+          { id:"salesLeads", label:"Number of Sales Leads / Year", min:100000, max:5000000, step:100000, unit:"", defaultValue:0,
+            guidance:"Total sales leads across all channels and markets annually" },
+          { id:"salesConversionImprovement", label:"Conversion Rate Improvement", min:0.1, max:5, step:0.1, unit:"%", defaultValue:0,
+            guidance:"Expected improvement in lead-to-sale conversion rate" },
+          { id:"avgCustomerValue", label:"Average Value of New Customer", min:50, max:2000, step:50, unit:"$", defaultValue:0,
+            guidance:"Average first-year revenue value of a newly acquired customer" }
         ],
-        calculate:v => ((v.salesLeads||2000000)*((v.salesConversionImprovement||0.5)/100)*(v.avgCustomerValue||400))*3
+        calculate:v => ((v.salesLeads||0)*((v.salesConversionImprovement||0)/100)*(v.avgCustomerValue||0))*3,
+        formula:"Sales leads × conversion improvement % × average customer value × 3 years"
       }
     ]
   },
   {
-    id:"marketing-insights", title:"Marketing Insights", description:"Optimize marketing performance with deeper customer understanding.",
+    id:"marketing-insights", title:"Marketing Insights",
+    description:"Optimise marketing performance with deeper understanding of what customers across your markets actually care about.",
     icon:<Search size={18} color="#06b6d4"/>, accentColor:"#06b6d4",
     cards:[
-      { id:"marketing-spend-efficiency", title:"Marketing Spend Efficiency Improvement",
-        problem:"Marketing budgets are wasted on broad campaigns that fail to resonate because teams lack granular data on which messages actually drive customer interest.",
-        solution:"The result is higher conversion rates from the same marketing spend, maximizing the ROI of every marketing euro.",
+      {
+        id:"marketing-spend-efficiency", title:"Marketing Spend Efficiency",
+        problem:"Marketing investment is allocated to campaigns based on historical performance and broad assumptions about customer priorities, with limited ability to connect messaging to the actual language and concerns of operating company customers in each market.",
+        solution:"Interaction analysis gives marketing teams a grounded view of the themes, concerns, and language patterns most relevant to each market, enabling more targeted campaigns that perform better against the same spend.",
         icon:<Search size={20} color="#06b6d4"/>,
         inputs:[
-          { id:"annualMarketingSpend", label:"Annual marketing campaign spend", min:10000000, max:1000000000, step:10000000, unit:"€", defaultValue:50000000 },
-          { id:"conversionEfficiencyLift", label:"% improvement in campaign conversion efficiency", min:0.5, max:20, step:0.5, unit:"%", defaultValue:4 }
+          { id:"annualMarketingSpend", label:"Annual Marketing Campaign Spend", min:10000000, max:1000000000, step:10000000, unit:"€", defaultValue:0,
+            guidance:"Total annual spend on marketing campaigns across all markets" },
+          { id:"conversionEfficiencyLift", label:"Conversion Efficiency Improvement", min:0.5, max:20, step:0.5, unit:"%", defaultValue:0,
+            guidance:"Expected improvement in campaign conversion rate from better customer insight" }
         ],
-        calculate:v => ((v.annualMarketingSpend||50000000)*((v.conversionEfficiencyLift||4)/100))*3
+        calculate:v => ((v.annualMarketingSpend||0)*((v.conversionEfficiencyLift||0)/100))*3,
+        formula:"Annual marketing spend × conversion efficiency improvement % × 3 years"
       },
-      { id:"reduced-cac", title:"Reduced Customer Acquisition Cost (CAC)",
-        problem:"High customer acquisition costs persist when marketing spend is allocated to low-performing channels due to a lack of deep insight into the customer journey.",
-        solution:"Improved targeting and channel optimization lead to significant acquisition efficiency gains.",
+      {
+        id:"reduced-cac", title:"Reduced Customer Acquisition Cost",
+        problem:"Acquisition costs remain high when spend is allocated to channels and messages that are only partially aligned with how prospective customers are actually making decisions — a gap that is difficult to close without visibility into interaction-level data.",
+        solution:"Improved targeting based on interaction intelligence reduces misallocated acquisition spend and improves the efficiency of each campaign, lowering the average cost of bringing a new customer on board.",
         icon:<Search size={20} color="#06b6d4"/>,
         inputs:[
-          { id:"annualAcquired", label:"Customers acquired annually", min:100000, max:5000000, step:100000, unit:"", defaultValue:1500000 },
-          { id:"avgCac", label:"Average CAC", min:10, max:500, step:10, unit:"$", defaultValue:120 },
-          { id:"cacReduction", label:"CAC reduction from targeting", min:0.5, max:10, step:0.5, unit:"%", defaultValue:1 }
+          { id:"annualAcquired", label:"Customers Acquired Annually", min:100000, max:5000000, step:100000, unit:"", defaultValue:0,
+            guidance:"Total new customers acquired across all markets and channels annually" },
+          { id:"avgCac", label:"Average Customer Acquisition Cost", min:10, max:500, step:10, unit:"$", defaultValue:0,
+            guidance:"Current average cost to acquire a new customer" },
+          { id:"cacReduction", label:"CAC Reduction from Better Targeting", min:0.5, max:10, step:0.5, unit:"%", defaultValue:0,
+            guidance:"Expected reduction in acquisition cost from improved targeting" }
         ],
-        calculate:v => ((v.annualAcquired||1500000)*(v.avgCac||120)*((v.cacReduction||1)/100))*3
+        calculate:v => ((v.annualAcquired||0)*(v.avgCac||0)*((v.cacReduction||0)/100))*3,
+        formula:"Customers acquired annually × average CAC × CAC reduction % × 3 years"
       }
     ]
   },
   {
-    id:"care-operations", title:"Care Operations", description:"Empower your support team with coaching powered by The Answer Layer.",
+    id:"care-operations", title:"Care Performance",
+    description:"Improve agent productivity and service consistency across your shared service centres.",
     icon:<Headphones size={18} color="#f97316"/>, accentColor:"#f97316",
     cards:[
-      { id:"aht-reduction", title:"Reduced wrap-up time",
-        problem:"Human agents despise clicking drop-down menus in antiquated UIs, and they're not very good at it. We're all skeptical of that data, which often isn't up to date.",
-        solution:"We remove wrap-up time, and provide deeper insights into every interaction.",
+      {
+        id:"aht-reduction", title:"Reduced Wrap-Up Time",
+        problem:"Agents in shared service centres spend a significant portion of each interaction on post-call administration — selecting disposition codes, updating records, and summarising outcomes in legacy systems that were not designed for speed or accuracy at scale.",
+        solution:"The platform automates interaction summarisation and outcome tagging in real time, removing the manual wrap-up burden from agents and producing more consistent, structured data for operational reporting across all supported markets.",
         icon:<Headphones size={20} color="#f97316"/>,
         inputs:[
-          { id:"agentCount", label:"Number of Agents", min:10, max:1000, step:10, unit:"", defaultValue:50 },
-          { id:"callsPerDay", label:"Conversations per Agent/Day", min:5, max:100, step:5, unit:"", defaultValue:40 },
-          { id:"wrapUpTimeSaved", label:"Wrap-up time saved per call", min:0.5, max:10, step:0.5, unit:"min", defaultValue:2 },
-          { id:"agentAnnualCost", label:"Agent Annual Loaded Cost", min:5000, max:150000, step:1000, unit:"€", defaultValue:15000 }
+          { id:"agentCount", label:"Number of Agents", min:10, max:1000, step:10, unit:"", defaultValue:0,
+            guidance:"Total agents across your shared service centres" },
+          { id:"callsPerDay", label:"Interactions per Agent per Day", min:5, max:100, step:5, unit:"", defaultValue:0,
+            guidance:"Average daily interactions handled per agent" },
+          { id:"wrapUpTimeSaved", label:"Wrap-Up Time Saved per Interaction", min:0.5, max:10, step:0.5, unit:"min", defaultValue:0,
+            guidance:"Estimated minutes of wrap-up time eliminated per interaction" },
+          { id:"agentAnnualCost", label:"Agent Annual Loaded Cost", min:5000, max:150000, step:1000, unit:"€", defaultValue:0,
+            guidance:"Include salary, benefits and on-costs per agent" }
         ],
-        calculate:v => ((v.wrapUpTimeSaved||2)*(v.agentCount||50)*(v.callsPerDay||40)*250*((v.agentAnnualCost||15000)/120000))*3
+        calculate:v => ((v.wrapUpTimeSaved||0)*(v.agentCount||0)*(v.callsPerDay||0)*250*((v.agentAnnualCost||0)/120000))*3,
+        formula:"Wrap-up time saved (hrs) × agents × interactions per day × 250 working days × hourly rate × 3 years"
       },
-      { id:"personalized-coaching", title:"Personalized Coaching",
-        problem:"Support agents often struggle with inconsistent performance and slow resolution times because they lack real-time, personalized guidance on how to handle complex customer interactions.",
-        solution:"Coaching from The Answer Layer helps agents resolve issues more effectively during the first interaction.",
+      {
+        id:"personalised-coaching", title:"Personalised Coaching",
+        problem:"Performance variation across large agent populations is difficult to address at scale when coaching is based on manual sampling of a small fraction of total interactions. Most agents receive generic feedback that does not reflect their specific patterns or the markets they support.",
+        solution:"Automated analysis of every interaction enables targeted, evidence-based coaching for each agent — identifying the specific behaviours and conversation patterns that, if improved, would have the greatest measurable impact on performance.",
         icon:<Headphones size={20} color="#f97316"/>,
         inputs:[
-          { id:"agents", label:"Number of Agents", min:100, max:20000, step:100, unit:"", defaultValue:8000 },
-          { id:"avgSalary", label:"Average Annual Loaded Cost", min:5000, max:100000, step:1000, unit:"$", defaultValue:15000 },
-          { id:"prodImprovement", label:"Productivity improvement", min:0.1, max:10, step:0.1, unit:"%", defaultValue:0.1 }
+          { id:"agents", label:"Number of Agents", min:100, max:20000, step:100, unit:"", defaultValue:0,
+            guidance:"Total agents across your shared service centres" },
+          { id:"avgSalary", label:"Average Annual Loaded Cost", min:5000, max:100000, step:1000, unit:"$", defaultValue:0,
+            guidance:"Include salary, benefits and on-costs per agent" },
+          { id:"prodImprovement", label:"Productivity Improvement", min:0.1, max:10, step:0.1, unit:"%", defaultValue:0,
+            guidance:"Expected improvement in agent productivity from targeted, evidence-based coaching" }
         ],
-        calculate:v => ((v.agents||8000)*(v.avgSalary||15000)*((v.prodImprovement||0.1)/100))*3
+        calculate:v => ((v.agents||0)*(v.avgSalary||0)*((v.prodImprovement||0)/100))*3,
+        formula:"Number of agents × average annual cost × productivity improvement % × 3 years"
       },
-      { id:"reduced-agent-churn", title:"Reduced Agent Churn",
-        problem:"High agent turnover is often driven by job frustration, lack of support, and the stress of handling difficult customer issues without adequate tools or visibility.",
-        solution:"Lower attrition means fewer hiring cycles and lower training costs, powered by reduced wrap-up time and an improved agent experience from The Answer Layer.",
+      {
+        id:"reduced-agent-attrition", title:"Reduced Agent Attrition",
+        problem:"High agent attrition in shared service centres is driven in part by administrative burden, inadequate tooling, and infrequent or imprecise feedback — factors that erode job satisfaction and increase the cost of maintaining stable headcount.",
+        solution:"Reducing wrap-up time and providing agents with clear, actionable performance insight based on their actual interactions improves the working experience and reduces the attrition that generates ongoing recruitment and training costs.",
         icon:<Users size={20} color="#f97316"/>,
         inputs:[
-          { id:"totalAgentsChurn", label:"Total number of support agents", min:100, max:50000, step:100, unit:"", defaultValue:8000 },
-          { id:"attritionReduction", label:"Reduction in attrition rate", min:0.5, max:20, step:0.5, unit:"%", defaultValue:4 },
-          { id:"hiringCost", label:"Cost to hire & train per agent", min:1000, max:50000, step:500, unit:"€", defaultValue:1000 }
+          { id:"totalAgentsChurn", label:"Total Number of Support Agents", min:100, max:50000, step:100, unit:"", defaultValue:0,
+            guidance:"Total agents across all shared service centres" },
+          { id:"attritionReduction", label:"Reduction in Attrition Rate", min:0.5, max:20, step:0.5, unit:"%", defaultValue:0,
+            guidance:"Expected reduction in annual attrition rate" },
+          { id:"hiringCost", label:"Cost to Hire and Train per Agent", min:1000, max:50000, step:500, unit:"€", defaultValue:0,
+            guidance:"Include recruitment, onboarding and training costs" }
         ],
-        calculate:v => ((v.totalAgentsChurn||8000)*((v.attritionReduction||4)/100)*(v.hiringCost||1000))*3
+        calculate:v => ((v.totalAgentsChurn||0)*((v.attritionReduction||0)/100)*(v.hiringCost||0))*3,
+        formula:"Total agents × attrition reduction % × cost to hire and train per agent × 3 years"
       }
     ]
   },
   {
-    id:"strategic-decision-velocity", title:"Strategic Decision Velocity", description:"Accelerate decision-making and eliminate administrative friction.",
+    id:"strategic-decision-velocity", title:"Strategic Decision Velocity",
+    description:"Accelerate decision-making and reduce the time from insight to action across your organisation.",
     icon:<Monitor size={18} color="#ec4899"/>, accentColor:"#ec4899",
     cards:[
-      { id:"analysis-productivity-gain", title:"Analysis Productivity Gain",
-        problem:"Teams spend significant time compiling reports, exporting data, and preparing presentations.",
-        solution:"Automating insight generation and auto-exporting to PowerPoint reduces the manual analysis burden.",
+      {
+        id:"analysis-productivity-gain", title:"Analysis Productivity Gain",
+        problem:"Analysts and managers across operating companies spend significant time compiling reports, extracting data from disparate systems, and preparing presentations — work that delays the availability of insight and reduces the time available for higher-value analysis.",
+        solution:"Automated insight generation and structured reporting reduces the time from question to answer, enabling teams to spend more time acting on intelligence rather than assembling it from multiple sources.",
         icon:<Monitor size={20} color="#ec4899"/>,
         inputs:[
-          { id:"analystCount", label:"Number of analysts/managers", min:10, max:2000, step:10, unit:"", defaultValue:200 },
-          { id:"hoursSaved", label:"Hours saved per month", min:1, max:40, step:1, unit:"hr", defaultValue:6 },
-          { id:"hourlyCost", label:"Average Annual Loaded Cost", min:60000, max:400000, step:5000, unit:"€", defaultValue:130000 }
+          { id:"analystCount", label:"Number of Analysts / Managers", min:10, max:2000, step:10, unit:"", defaultValue:0,
+            guidance:"Analysts, managers and team leads who regularly produce or consume performance reports" },
+          { id:"hoursSaved", label:"Hours Saved per Month", min:1, max:40, step:1, unit:"hr", defaultValue:0,
+            guidance:"Estimated hours saved per person per month through automated reporting" },
+          { id:"hourlyCost", label:"Average Annual Loaded Cost", min:60000, max:400000, step:5000, unit:"€", defaultValue:0,
+            guidance:"Include salary, benefits and on-costs" }
         ],
-        calculate:v => ((v.analystCount||200)*(v.hoursSaved||6)*12*((v.hourlyCost||130000)/2000))*3
+        calculate:v => ((v.analystCount||0)*(v.hoursSaved||0)*12*((v.hourlyCost||0)/2000))*3,
+        formula:"Number of analysts × hours saved per month × 12 months × hourly rate × 3 years"
       },
-      { id:"faster-decision-making", title:"Faster Decision Making",
-        problem:"Senior leaders spend significant time waiting for reports and reviewing presentations, delaying strategic actions.",
-        solution:"Self-service insights from The Answer Layer provide immediate access to customer data, accelerating product, campaign, and care updates.",
+      {
+        id:"faster-decision-making", title:"Faster Decision Making",
+        problem:"Strategic decisions are delayed when the underlying insight — on customer behaviour, market performance, or service quality — is not readily accessible and requires time to compile and validate before it can be presented to senior stakeholders.",
+        solution:"Self-service access to structured interaction intelligence enables senior stakeholders to interrogate performance data directly, reducing the cycle time between identifying a question and making an informed decision across markets.",
         icon:<Monitor size={20} color="#ec4899"/>,
         inputs:[
-          { id:"decisionCount", label:"Strategic decisions annually", min:10, max:500, step:10, unit:"", defaultValue:80 },
-          { id:"decisionValue", label:"Estimated value per decision", min:1000, max:1000000, step:1000, unit:"€", defaultValue:100000 },
-          { id:"accelerationFactor", label:"Acceleration factor", min:1, max:50, step:1, unit:"%", defaultValue:10 }
+          { id:"decisionCount", label:"Strategic Decisions Annually", min:10, max:500, step:10, unit:"", defaultValue:0,
+            guidance:"Significant strategic decisions that depend on customer or market data annually" },
+          { id:"decisionValue", label:"Estimated Value per Decision", min:1000, max:1000000, step:1000, unit:"€", defaultValue:0,
+            guidance:"Estimated average value at stake per strategic decision" },
+          { id:"accelerationFactor", label:"Acceleration Factor", min:1, max:50, step:1, unit:"%", defaultValue:0,
+            guidance:"Estimated improvement in decision value from faster, better-informed decisions" }
         ],
-        calculate:v => ((v.decisionCount||80)*(v.decisionValue||100000)*((v.accelerationFactor||10)/100))*3
+        calculate:v => ((v.decisionCount||0)*(v.decisionValue||0)*((v.accelerationFactor||0)/100))*3,
+        formula:"Strategic decisions per year × estimated value per decision × acceleration factor % × 3 years"
       }
     ]
   }
@@ -358,6 +481,7 @@ export default function App() {
   const [currency, setCurrency] = useState(CURRENCIES[0]);
   const [subCost, setSubCost] = useState(0);
   const [shareStatus, setShareStatus] = useState<'idle' | 'saving' | 'copied' | 'error'>('idle');
+  const [client, setClient] = useState<ClientConfig | null>(null);
 
   const handleValueChange = (cardId, inputId, value) => {
     setGlobalValues(prev => ({ ...prev, [cardId]: { ...(prev[cardId]||{}), [inputId]: value } }));
@@ -406,6 +530,15 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const guid = new URLSearchParams(window.location.search).get('c');
+    const config = getClient(guid);
+    if (!config) return;
+    setClient(config);
+    const c = CURRENCIES.find(x => x.code === config.defaultCurrency);
+    if (c) setCurrency(c);
+  }, []);
+
+  useEffect(() => {
     const id = new URLSearchParams(window.location.search).get('s');
     if (!id) return;
     fetch(`/api/load/${id}`)
@@ -441,6 +574,7 @@ export default function App() {
   };
 
   const sym = currency.symbol;
+  const locale = client?.locale ?? 'en-GB';
 
   return (
     <div style={{ display:"flex", flexDirection:"column", minHeight:"100vh", background:"#f8fafc", fontFamily:"system-ui, -apple-system, sans-serif" }}>
@@ -463,21 +597,35 @@ export default function App() {
           </div>
           <span style={{ fontWeight:800, color:"#0f172a" }}>ROI Engine</span>
         </div>
-        <button onClick={() => setMobileOpen(!mobileOpen)} style={{ background:"none", border:"none", cursor:"pointer", padding:4 }}>
-          {mobileOpen ? <X size={24}/> : <Menu size={24}/>}
-        </button>
+        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+          {client?.logoUrl && (
+            <img src={client.logoUrl} alt={client.name} style={{ height:24, maxWidth:80, objectFit:"contain" }}/>
+          )}
+          <button onClick={() => setMobileOpen(!mobileOpen)} style={{ background:"none", border:"none", cursor:"pointer", padding:4 }}>
+            {mobileOpen ? <X size={24}/> : <Menu size={24}/>}
+          </button>
+        </div>
       </div>
 
       <div className="layout" style={{ display:"flex", flexDirection:"column", flex:1 }}>
         {/* Sidebar */}
         <aside className="sidebar" style={{ display: mobileOpen ? "flex" : "none", flexDirection:"column", width:260, minWidth:260, background:"#fff", borderRight:"1px solid #e2e8f0", position:"sticky", top:0, height:"100vh", overflowY:"auto", zIndex:40 }}>
           <div style={{ padding:"24px 20px 16px" }}>
-            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:28 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom: client ? 12 : 28 }}>
               <div style={{ width:32, height:32, background:"#0f172a", borderRadius:6, display:"flex", alignItems:"center", justifyContent:"center" }}>
                 <TrendingUp size={16} color="#fff"/>
               </div>
               <span style={{ fontWeight:800, fontSize:18, color:"#0f172a" }}>ROI Engine</span>
             </div>
+            {client && (
+              <div style={{ marginBottom:20, paddingBottom:16, borderBottom:"1px solid #f1f5f9" }}>
+                <div style={{ fontSize:9, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:1, marginBottom:6 }}>Prepared for</div>
+                {client.logoUrl
+                  ? <img src={client.logoUrl} alt={client.name} style={{ height:28, maxWidth:110, objectFit:"contain", objectPosition:"left center" }}/>
+                  : <div style={{ fontSize:14, fontWeight:700, color:"#0f172a" }}>{client.name}</div>
+                }
+              </div>
+            )}
 
             <div style={{ fontSize:10, fontWeight:800, color:"#64748b", textTransform:"uppercase", letterSpacing:1.5, marginBottom:8, paddingLeft:4 }}>Overview</div>
             <button className={`nav-btn ${activeSection==="summary"?"active":""}`} onClick={() => scrollTo("summary")} style={{ color: activeSection==="summary"?"#0f172a":"#64748b", marginBottom:12 }}>
@@ -514,12 +662,17 @@ export default function App() {
 
           {/* Summary Section */}
           <section id="summary" style={{ marginBottom:80 }}>
-            <div style={{ marginBottom:32 }}>
-              <div style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"4px 12px", background:"#f1f5f9", borderRadius:999, fontSize:11, fontWeight:700, color:"#475569", textTransform:"uppercase", letterSpacing:1, marginBottom:16 }}>
-                <TrendingUp size={12}/> Value Realization Report
+            <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:24, marginBottom:32 }}>
+              <div style={{ maxWidth:640 }}>
+                <div style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"4px 12px", background:"#f1f5f9", borderRadius:999, fontSize:11, fontWeight:700, color:"#475569", textTransform:"uppercase", letterSpacing:1, marginBottom:16 }}>
+                  <TrendingUp size={12}/> {localise("Value Realisation Report", locale)}
+                </div>
+                <h1 style={{ fontSize:40, fontWeight:800, color:"#0f172a", lineHeight:1.1, margin:"0 0 12px", letterSpacing:-1 }}>Your value from our partnership.</h1>
+                <p style={{ fontSize:17, color:"#475569", lineHeight:1.7, margin:0 }}>Enter your numbers across each area of value below. The estimates are built from your inputs — every figure is traceable to its calculation.</p>
               </div>
-              <h1 style={{ fontSize:40, fontWeight:800, color:"#0f172a", lineHeight:1.1, margin:"0 0 12px", letterSpacing:-1 }}>Your value from our partnership.</h1>
-              <p style={{ fontSize:17, color:"#475569", lineHeight:1.7, maxWidth:640, margin:0 }}>Based on your current inputs, here is the estimated 3-year impact our platform can deliver across your organization.</p>
+              {client?.logoUrl && (
+                <img src={client.logoUrl} alt={client.name} style={{ height:48, maxWidth:180, objectFit:"contain", objectPosition:"right center", flexShrink:0, marginTop:4 }}/>
+              )}
             </div>
 
             {/* Top KPI cards */}
@@ -550,8 +703,7 @@ export default function App() {
                     </div>
                   ) : (
                     <div style={{ textAlign:"center", padding:"16px 0" }}>
-                      <div style={{ fontSize:24, marginBottom:6 }}>✨ 🦄 ✨</div>
-                      <p style={{ fontSize:10, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:1 }}>Enter a subscription cost above</p>
+                      <p style={{ fontSize:13, color:"#94a3b8", margin:0 }}>Enter a subscription cost above to see your ROI.</p>
                     </div>
                   )}
                 </div>
@@ -560,8 +712,8 @@ export default function App() {
 
             {/* Waterfall */}
             <div className="card" style={{ marginBottom:24 }}>
-              <h3 style={{ fontSize:18, fontWeight:700, color:"#0f172a", marginBottom:4 }}>Value Realization Waterfall</h3>
-              <p style={{ fontSize:13, color:"#64748b", marginBottom:24 }}>How each strategic area contributes to your 3-year total.</p>
+              <h3 style={{ fontSize:18, fontWeight:700, color:"#0f172a", marginBottom:4 }}>{localise("Value Realisation Waterfall", locale)}</h3>
+              <p style={{ fontSize:13, color:"#64748b", marginBottom:24 }}>How each area of value contributes to your 3-year total.</p>
               <div style={{ height:360 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={waterfallData} margin={{ top:10, right:20, left:20, bottom:50 }}>
@@ -599,7 +751,7 @@ export default function App() {
                   </div>
                   <div style={{ fontSize:12, fontWeight:700, color:"#0f172a", marginBottom:10 }}>{r.title}</div>
                   <div style={{ height:4, background:"#f1f5f9", borderRadius:999 }}>
-                    <div style={{ height:"100%", borderRadius:999, background:r.accentColor, width:`${Math.max(2,(r.total/totalValue)*100)}%`, transition:"width 0.5s" }}/>
+                    <div style={{ height:"100%", borderRadius:999, background:r.accentColor, width:`${totalValue > 0 ? Math.max(2,(r.total/totalValue)*100) : 2}%`, transition:"width 0.5s" }}/>
                   </div>
                 </div>
               ))}
@@ -613,11 +765,11 @@ export default function App() {
                 {section.icon && <span style={{ fontSize:32 }}>{section.icon}</span>}
                 <h2 style={{ fontSize:34, fontWeight:800, color:"#0f172a", letterSpacing:-0.5, margin:0 }}>{section.title}</h2>
               </div>
-              <p style={{ fontSize:16, color:"#475569", marginBottom:32, lineHeight:1.7 }}>{section.description}</p>
+              <p style={{ fontSize:16, color:"#475569", marginBottom:32, lineHeight:1.7 }}>{localise(section.description, locale)}</p>
               <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(360px, 1fr))", gap:20 }}>
                 {section.cards.map((card, i) => (
                   <ROICard key={i} {...card} accentColor={section.accentColor}
-                    values={getCardValues(card)} currencySymbol={sym}
+                    values={getCardValues(card)} currencySymbol={sym} locale={locale}
                     onValueChange={(inputId, val) => handleValueChange(card.id, inputId, val)}
                   />
                 ))}
@@ -628,8 +780,8 @@ export default function App() {
           {/* Footer CTA */}
           <div style={{ background:"#0f172a", borderRadius:20, padding:"40px 48px", position:"relative", overflow:"hidden" }}>
             <div style={{ position:"relative", zIndex:1 }}>
-              <h2 style={{ fontSize:28, fontWeight:800, color:"#fff", marginBottom:12 }}>Ready to realize this value?</h2>
-              <p style={{ color:"#94a3b8", maxWidth:460, lineHeight:1.7, marginBottom:24 }}>Our platform helps enterprise teams automate these workflows and capture the 3-year value estimated above in as little as 30 days.</p>
+              <h2 style={{ fontSize:28, fontWeight:800, color:"#fff", marginBottom:12 }}>{localise("Ready to realise this value?", locale)}</h2>
+              <p style={{ color:"#94a3b8", maxWidth:460, lineHeight:1.7, marginBottom:24 }}>Our platform helps {client ? client.name : "enterprise teams"} capture the 3-year value estimated above — typically within 30 days of going live.</p>
               <a href="https://cxconnect.ai" target="_blank" rel="noopener noreferrer"
                 style={{ display:"inline-block", padding:"12px 24px", background:"#fff", color:"#0f172a", fontWeight:700, borderRadius:10, textDecoration:"none", fontSize:14 }}>
                 Get in touch
