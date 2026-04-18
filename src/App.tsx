@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import { getClient, localise } from "./clients";
 import type { ClientConfig } from "./clients";
+import Admin from "./Admin";
 
 const CURRENCIES = [
   { code: "EUR", symbol: "€", label: "Euro" },
@@ -531,11 +532,17 @@ export default function App() {
 
   useEffect(() => {
     const guid = new URLSearchParams(window.location.search).get('c');
-    const config = getClient(guid);
-    if (!config) return;
-    setClient(config);
-    const c = CURRENCIES.find(x => x.code === config.defaultCurrency);
-    if (c) setCurrency(c);
+    if (!guid) return;
+    const apply = (config: ClientConfig | null) => {
+      if (!config) return;
+      setClient(config);
+      const c = CURRENCIES.find(x => x.code === config.defaultCurrency);
+      if (c) setCurrency(c);
+    };
+    fetch(`/api/client?c=${guid}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => apply(data ?? getClient(guid)))
+      .catch(() => apply(getClient(guid)));
   }, []);
 
   useEffect(() => {
@@ -575,6 +582,9 @@ export default function App() {
 
   const sym = currency.symbol;
   const locale = client?.locale ?? 'en-GB';
+
+  const adminKey = new URLSearchParams(window.location.search).get('admin');
+  if (adminKey) return <Admin adminKey={adminKey} />;
 
   return (
     <div style={{ display:"flex", flexDirection:"column", minHeight:"100vh", background:"#f8fafc", fontFamily:"system-ui, -apple-system, sans-serif" }}>
