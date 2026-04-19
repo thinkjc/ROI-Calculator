@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import {
   LayoutDashboard, ShieldCheck, Award, UserMinus, Users,
   TrendingUp, Search, Headphones, Monitor, ChevronRight,
-  Menu, X, Share2
+  Menu, X, Share2, Sparkles
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -483,6 +483,9 @@ export default function App() {
   const [subCost, setSubCost] = useState(0);
   const [shareStatus, setShareStatus] = useState<'idle' | 'saving' | 'copied' | 'error'>('idle');
   const [client, setClient] = useState<ClientConfig | null>(null);
+  const [benchmarkUrl, setBenchmarkUrl] = useState('');
+  const [benchmarkStatus, setBenchmarkStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+  const [benchmarkError, setBenchmarkError] = useState('');
 
   const handleValueChange = (cardId, inputId, value) => {
     setGlobalValues(prev => ({ ...prev, [cardId]: { ...(prev[cardId]||{}), [inputId]: value } }));
@@ -560,6 +563,26 @@ export default function App() {
       })
       .catch(console.error);
   }, []);
+
+  const generateBenchmarks = async () => {
+    if (!benchmarkUrl.trim()) return;
+    setBenchmarkStatus('loading');
+    setBenchmarkError('');
+    try {
+      const res = await fetch('/api/benchmarks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: benchmarkUrl.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Failed to generate benchmarks');
+      setGlobalValues(data.values);
+      setBenchmarkStatus('done');
+    } catch (err) {
+      setBenchmarkError(err instanceof Error ? err.message : 'Something went wrong');
+      setBenchmarkStatus('error');
+    }
+  };
 
   const shareScenario = async () => {
     setShareStatus('saving');
@@ -669,6 +692,44 @@ export default function App() {
 
         {/* Main */}
         <main style={{ flex:1, padding:"40px 32px", maxWidth:1100, margin:"0 auto", width:"100%" }}>
+
+          {/* AI Benchmarks Card */}
+          <div style={{ marginBottom:24, background:"linear-gradient(135deg,#f5f3ff 0%,#ede9fe 100%)", border:"1px solid #ddd6fe", borderRadius:12, padding:"20px 24px" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+              <div style={{ width:34, height:34, background:"#6366f1", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                <Sparkles size={16} color="#fff" />
+              </div>
+              <div>
+                <div style={{ fontWeight:700, color:"#0f172a", fontSize:14, lineHeight:1.2 }}>AI Industry Benchmarks</div>
+                <div style={{ fontSize:12, color:"#64748b", marginTop:2 }}>Enter your company website and we'll pre-fill every field with realistic industry estimates.</div>
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:8 }}>
+              <input
+                type="text"
+                value={benchmarkUrl}
+                onChange={(e: { target: HTMLInputElement }) => { setBenchmarkUrl(e.target.value); if (benchmarkStatus !== 'idle') setBenchmarkStatus('idle'); }}
+                onKeyDown={(e: { key: string }) => e.key === 'Enter' && generateBenchmarks()}
+                placeholder="e.g. vodafone.com or https://yourcompany.com"
+                style={{ flex:1, padding:"9px 12px", border:"1px solid #c4b5fd", borderRadius:8, fontSize:13, color:"#0f172a", background:"#fff", outline:"none" }}
+              />
+              <button
+                onClick={generateBenchmarks}
+                disabled={!benchmarkUrl.trim() || benchmarkStatus === 'loading'}
+                style={{ padding:"9px 18px", background: benchmarkUrl.trim() && benchmarkStatus !== 'loading' ? "#6366f1" : "#ddd6fe", color: benchmarkUrl.trim() && benchmarkStatus !== 'loading' ? "#fff" : "#a78bfa", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor: benchmarkUrl.trim() && benchmarkStatus !== 'loading' ? "pointer" : "not-allowed", whiteSpace:"nowrap", transition:"background 0.15s" }}
+              >
+                {benchmarkStatus === 'loading' ? 'Generating…' : 'Add Benchmarks'}
+              </button>
+            </div>
+            {benchmarkStatus === 'error' && (
+              <div style={{ marginTop:10, fontSize:12, color:"#dc2626", padding:"7px 10px", background:"#fef2f2", borderRadius:6 }}>{benchmarkError}</div>
+            )}
+            {benchmarkStatus === 'done' && (
+              <div style={{ marginTop:10, fontSize:12, color:"#059669", padding:"7px 10px", background:"#f0fdf4", borderRadius:6 }}>
+                ✓ Values pre-filled with industry benchmarks — review and adjust any figure to match your specific situation.
+              </div>
+            )}
+          </div>
 
           {/* Summary Section */}
           <section id="summary" style={{ marginBottom:80 }}>
