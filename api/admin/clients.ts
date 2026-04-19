@@ -2,8 +2,6 @@ import { Redis } from '@upstash/redis';
 import type { Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 
-const redis = Redis.fromEnv();
-
 function isAuthorized(req: Request): boolean {
   return !!process.env.ADMIN_GUID && req.headers['x-admin-key'] === process.env.ADMIN_GUID;
 }
@@ -11,6 +9,7 @@ function isAuthorized(req: Request): boolean {
 export default async function handler(req: Request, res: Response) {
   if (!isAuthorized(req)) return res.status(401).json({ error: 'Unauthorized' });
   try {
+    const redis = Redis.fromEnv();
     const clients = await redis.get<Record<string, any>>('roi:clients') ?? {};
     if (req.method === 'GET') {
       return res.status(200).json(clients);

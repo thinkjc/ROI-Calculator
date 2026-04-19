@@ -182,15 +182,20 @@ export default function Admin({ adminKey }: { adminKey: string }) {
     setSaveError(null);
     const payload = { name: form.name.trim(), logoUrl: form.logoUrl || undefined, locale: form.locale, defaultCurrency: form.defaultCurrency };
     try {
+      const parseResponse = async (r: Response) => {
+        const text = await r.text();
+        try { return { ok: r.ok, status: r.status, data: JSON.parse(text) }; }
+        catch { return { ok: r.ok, status: r.status, data: null }; }
+      };
       if (editing) {
         const r = await fetch(`/api/admin/clients/${editing}`, { method: 'PUT', headers, body: JSON.stringify(payload) });
-        const data = await r.json();
-        if (!r.ok) throw new Error(data?.error ?? `Server error (${r.status})`);
+        const { ok, status, data } = await parseResponse(r);
+        if (!ok) throw new Error(data?.error ?? `Server error (${status})`);
         setClients(cs => cs.map(c => c.id === editing ? { id: editing, ...data } : c));
       } else {
         const r = await fetch('/api/admin/clients', { method: 'POST', headers, body: JSON.stringify(payload) });
-        const data = await r.json();
-        if (!r.ok) throw new Error(data?.error ?? `Server error (${r.status})`);
+        const { ok, status, data } = await parseResponse(r);
+        if (!ok) throw new Error(data?.error ?? `Server error (${status})`);
         setClients(cs => [...cs, data]);
       }
       closeForm();

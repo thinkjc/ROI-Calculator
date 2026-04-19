@@ -1,8 +1,6 @@
 import { Redis } from '@upstash/redis';
 import type { Request, Response } from 'express';
 
-const redis = Redis.fromEnv();
-
 function isAuthorized(req: Request): boolean {
   return !!process.env.ADMIN_GUID && req.headers['x-admin-key'] === process.env.ADMIN_GUID;
 }
@@ -12,6 +10,7 @@ export default async function handler(req: Request, res: Response) {
   const id = (req.query as Record<string, string>).id;
   if (!id) return res.status(400).json({ error: 'Missing ID' });
   try {
+    const redis = Redis.fromEnv();
     const clients = await redis.get<Record<string, any>>('roi:clients') ?? {};
     if (req.method === 'PUT') {
       if (!clients[id]) return res.status(404).json({ error: 'Client not found' });
