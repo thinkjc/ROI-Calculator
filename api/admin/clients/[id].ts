@@ -14,8 +14,8 @@ export default async function handler(req: Request, res: Response) {
     const clients = await redis.get<Record<string, any>>('roi:clients') ?? {};
     if (req.method === 'PUT') {
       if (!clients[id]) return res.status(404).json({ error: 'Client not found' });
-      const { name, logoUrl, locale, defaultCurrency } = req.body;
-      clients[id] = { name, logoUrl: logoUrl || undefined, locale, defaultCurrency };
+      const { name, logoUrl, locale, defaultCurrency, showInvestmentOverview } = req.body;
+      clients[id] = { name, logoUrl: logoUrl || undefined, locale, defaultCurrency, showInvestmentOverview: !!showInvestmentOverview };
       await redis.set('roi:clients', clients);
       return res.status(200).json({ id, ...clients[id] });
     }

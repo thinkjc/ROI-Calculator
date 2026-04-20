@@ -7,6 +7,7 @@ type ClientConfig = {
   logoUrl?: string;
   locale: 'en-GB' | 'en-US';
   defaultCurrency: 'GBP' | 'EUR' | 'USD' | 'JPY';
+  showInvestmentOverview?: boolean;
 };
 
 type FormState = {
@@ -15,9 +16,10 @@ type FormState = {
   logoUrl: string;
   locale: 'en-GB' | 'en-US';
   defaultCurrency: 'GBP' | 'EUR' | 'USD' | 'JPY';
+  showInvestmentOverview: boolean;
 };
 
-const emptyForm: FormState = { name: '', domain: '', logoUrl: '', locale: 'en-GB', defaultCurrency: 'GBP' };
+const emptyForm: FormState = { name: '', domain: '', logoUrl: '', locale: 'en-GB', defaultCurrency: 'GBP', showInvestmentOverview: false };
 
 // Tests candidate URLs in parallel, returns first 3 that load successfully.
 function findLogos(domain: string): Promise<string[]> {
@@ -163,7 +165,7 @@ export default function Admin({ adminKey }: { adminKey: string }) {
   };
 
   const openEdit = (c: ClientConfig) => {
-    setForm({ name: c.name, domain: '', logoUrl: c.logoUrl ?? '', locale: c.locale, defaultCurrency: c.defaultCurrency });
+    setForm({ name: c.name, domain: '', logoUrl: c.logoUrl ?? '', locale: c.locale, defaultCurrency: c.defaultCurrency, showInvestmentOverview: c.showInvestmentOverview ?? false });
     setLogoOptions([]); setLogoSearching(false);
     setSelectedLogo(c.logoUrl ?? '');
     setUploadedLogo(c.logoUrl?.startsWith('data:') ? c.logoUrl : null);
@@ -180,7 +182,7 @@ export default function Admin({ adminKey }: { adminKey: string }) {
     if (!form.name.trim()) return;
     setSaving(true);
     setSaveError(null);
-    const payload = { name: form.name.trim(), logoUrl: form.logoUrl || undefined, locale: form.locale, defaultCurrency: form.defaultCurrency };
+    const payload = { name: form.name.trim(), logoUrl: form.logoUrl || undefined, locale: form.locale, defaultCurrency: form.defaultCurrency, showInvestmentOverview: form.showInvestmentOverview };
     try {
       const parseResponse = async (r: Response) => {
         const text = await r.text();
@@ -435,6 +437,21 @@ export default function Admin({ adminKey }: { adminKey: string }) {
                   <option value="USD">$ — US Dollar</option>
                   <option value="JPY">¥ — Japanese Yen</option>
                 </select>
+              </div>
+
+              {/* Investment Overview toggle */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>Investment Overview</div>
+                  <div style={{ fontSize: 11, color: '#64748b' }}>Show pricing calculator to this client</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, showInvestmentOverview: !f.showInvestmentOverview }))}
+                  style={{ width: 44, height: 24, borderRadius: 999, border: 'none', cursor: 'pointer', background: form.showInvestmentOverview ? '#6366f1' : '#cbd5e1', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}
+                >
+                  <div style={{ position: 'absolute', top: 2, left: form.showInvestmentOverview ? 22 : 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }} />
+                </button>
               </div>
             </div>
 

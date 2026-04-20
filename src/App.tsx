@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import {
   LayoutDashboard, ShieldCheck, Award, UserMinus, Users,
   TrendingUp, Search, Headphones, Monitor, ChevronRight,
-  Menu, X, Share2, Sparkles
+  Menu, X, Share2, Sparkles, Calculator
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -11,6 +11,30 @@ import {
 import { getClient, localise } from "./clients";
 import type { ClientConfig } from "./clients";
 import Admin from "./Admin";
+
+const DATA_SOURCES = [
+  'Databricks','Genesys','Gorgias','Hubspot','Intercom',
+  'Microsoft Dynamics','Quo','Salesforce','Snowflake','Zendesk','Zoom','Other',
+];
+
+const TIERS = [
+  { name: 'Starter',  monthly: 950,  included: 12_000,  extraPer1k: 498, includedConns: 1 },
+  { name: 'Growth',   monthly: 1_950, included: 42_000,  extraPer1k: 294, includedConns: 1 },
+  { name: 'Scale',    monthly: 3_450, included: 120_000, extraPer1k: 180, includedConns: 2 },
+] as const;
+
+function calcQuote(conversations: number, dataSources: string[]) {
+  const tierCosts = TIERS.map(tier => {
+    const base = tier.monthly * 12;
+    const overBuckets = Math.max(0, Math.ceil((conversations - tier.included) / 1000));
+    const extraCost = overBuckets * tier.extraPer1k;
+    return { tier, base, overBuckets, extraCost, subtotal: base + extraCost };
+  });
+  const best = tierCosts.reduce((a, b) => a.subtotal < b.subtotal ? a : b);
+  const extraConns = Math.max(0, dataSources.length - best.tier.includedConns);
+  const connCost = extraConns * 3_500;
+  return { ...best, extraConns, connCost, total: best.subtotal + connCost };
+}
 
 const CURRENCIES = [
   { code: "EUR", symbol: "€", label: "Euro" },
@@ -486,6 +510,9 @@ export default function App() {
   const [benchmarkUrl, setBenchmarkUrl] = useState('');
   const [benchmarkStatus, setBenchmarkStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [benchmarkError, setBenchmarkError] = useState('');
+  const [investConversations, setInvestConversations] = useState(12000);
+  const [investDataSources, setInvestDataSources] = useState<string[]>([]);
+  const [quoteVisible, setQuoteVisible] = useState(false);
 
   const handleValueChange = (cardId, inputId, value) => {
     setGlobalValues(prev => ({ ...prev, [cardId]: { ...(prev[cardId]||{}), [inputId]: value } }));
@@ -527,7 +554,7 @@ export default function App() {
     const obs = new IntersectionObserver(entries => {
       entries.forEach(e => { if (e.isIntersecting) setActiveSection(e.target.id); });
     }, { rootMargin:"-20% 0px -70% 0px" });
-    ["summary", ...SECTIONS.map(s => s.id)].forEach(id => {
+    ["summary", ...SECTIONS.map(s => s.id), "investment"].forEach(id => {
       const el = document.getElementById(id); if (el) obs.observe(el);
     });
     return () => obs.disconnect();
@@ -683,6 +710,15 @@ export default function App() {
                 {activeSection===s.id && <ChevronRight size={12} color="#94a3b8" style={{ marginLeft:"auto" }}/>}
               </button>
             ))}
+            {client?.showInvestmentOverview && (
+              <>
+                <div style={{ fontSize:10, fontWeight:800, color:"#64748b", textTransform:"uppercase", letterSpacing:1.5, marginBottom:8, paddingLeft:4, marginTop:12 }}>Pricing</div>
+                <button className={`nav-btn ${activeSection==="investment"?"active":""}`} onClick={() => scrollTo("investment")} style={{ color: activeSection==="investment"?"#0f172a":"#64748b" }}>
+                  <Calculator size={16} color={activeSection==="investment"?"#0f172a":"#94a3b8"}/> Investment Overview
+                  {activeSection==="investment" && <ChevronRight size={12} color="#94a3b8" style={{ marginLeft:"auto" }}/>}
+                </button>
+              </>
+            )}
           </div>
 
           <div style={{ marginTop:"auto", padding:16, borderTop:"1px solid #f1f5f9" }}>
@@ -857,6 +893,115 @@ export default function App() {
               </div>
             </section>
           ))}
+
+          {/* Investment Overview */}
+          {client?.showInvestmentOverview && (() => {
+            const quote = calcQuote(investConversations, investDataSources);
+            const fmt = (n: number) => '$' + n.toLocaleString('en-US');
+            const toggleSource = (s: string) =>
+              setInvestDataSources(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
+            return (
+              <section id="investment" style={{ marginBottom:80, scrollMarginTop:80 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:16, marginBottom:8 }}>
+                  <Calculator size={32} color="#10b981"/>
+                  <h2 style={{ fontSize:34, fontWeight:800, color:"#0f172a", letterSpacing:-0.5, margin:0 }}>Investment Overview</h2>
+                </div>
+                <p style={{ fontSize:16, color:"#475569", marginBottom:32, lineHeight:1.7 }}>Understand the investment required based on your conversation volumes and the data sources you want to connect.</p>
+                <div className="card" style={{ maxWidth:680 }}>
+
+                  {/* Conversations */}
+                  <div style={{ marginBottom:24 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
+                      <label style={{ fontSize:12, fontWeight:700, color:"#0f172a" }}>Annual Customer Conversations</label>
+                      <input type="text"
+                        value={investConversations.toLocaleString('en-US')}
+                        onChange={e => { const n = Number(e.target.value.replace(/\D/g,'')); if (!isNaN(n)) { setInvestConversations(n); setQuoteVisible(false); }}}
+                        style={{ width:110, padding:"4px 8px", textAlign:"right", fontSize:13, fontWeight:700, color:"#0f172a", border:"1px solid #cbd5e1", borderRadius:6, outline:"none" }}
+                      />
+                    </div>
+                    <p style={{ fontSize:11, color:"#94a3b8", margin:"0 0 8px" }}>Total tickets, transcripts, or chat interactions per year</p>
+                    <input type="range" min={0} max={500000} step={1000} value={investConversations}
+                      onChange={e => { setInvestConversations(Number(e.target.value)); setQuoteVisible(false); }}
+                      style={{ width:"100%", height:6, borderRadius:9999, appearance:"none", cursor:"pointer", background:`linear-gradient(to right,#10b981 0%,#10b981 ${(investConversations/500000)*100}%,#e2e8f0 ${(investConversations/500000)*100}%,#e2e8f0 100%)` }}
+                    />
+                    <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:"#94a3b8", marginTop:4 }}>
+                      <span>0</span><span>500,000</span>
+                    </div>
+                  </div>
+
+                  {/* Data Sources */}
+                  <div style={{ marginBottom:24 }}>
+                    <label style={{ fontSize:12, fontWeight:700, color:"#0f172a", display:"block", marginBottom:4 }}>Data Sources</label>
+                    <p style={{ fontSize:11, color:"#94a3b8", margin:"0 0 10px" }}>Select the platforms you want to connect</p>
+                    <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+                      {DATA_SOURCES.map(src => {
+                        const on = investDataSources.includes(src);
+                        return (
+                          <button key={src} onClick={() => { toggleSource(src); setQuoteVisible(false); }}
+                            style={{ padding:"6px 12px", borderRadius:999, fontSize:12, fontWeight:600, cursor:"pointer", transition:"all 0.15s", border: on ? "2px solid #10b981" : "1.5px solid #e2e8f0", background: on ? "#f0fdf4" : "#f8fafc", color: on ? "#059669" : "#475569" }}>
+                            {on ? "✓ " : ""}{src}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {investDataSources.length > 0 && (
+                      <p style={{ fontSize:11, color:"#64748b", marginTop:8 }}>{investDataSources.length} source{investDataSources.length !== 1 ? "s" : ""} selected</p>
+                    )}
+                  </div>
+
+                  {/* Get a Quote */}
+                  <button onClick={() => setQuoteVisible(true)}
+                    style={{ width:"100%", padding:13, background:"#10b981", color:"#fff", border:"none", borderRadius:8, fontSize:14, fontWeight:700, cursor:"pointer", marginBottom: quoteVisible ? 24 : 0 }}>
+                    Get a Quote
+                  </button>
+
+                  {/* Quote result */}
+                  {quoteVisible && (
+                    <div>
+                      <div style={{ background:"linear-gradient(135deg,#f0fdf4,#dcfce7)", border:"1px solid #86efac", borderRadius:12, padding:"20px 24px", marginBottom:16 }}>
+                        <div style={{ fontSize:11, fontWeight:700, color:"#15803d", textTransform:"uppercase", letterSpacing:1, marginBottom:4 }}>Estimated Annual Investment</div>
+                        <div style={{ fontSize:40, fontWeight:800, color:"#0f172a", letterSpacing:-1 }}>{fmt(quote.total)}</div>
+                        <div style={{ fontSize:12, color:"#64748b", marginTop:4 }}>{quote.tier.name} Plan · {fmt(quote.tier.monthly)}/month</div>
+                      </div>
+
+                      <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:16 }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", fontSize:13, color:"#475569", padding:"8px 0", borderBottom:"1px solid #f1f5f9" }}>
+                          <span>{quote.tier.name} plan base ({quote.tier.included.toLocaleString()} conversations, {quote.tier.includedConns} connection{quote.tier.includedConns > 1 ? "s" : ""} included)</span>
+                          <span style={{ fontWeight:700, color:"#0f172a" }}>{fmt(quote.base)}</span>
+                        </div>
+                        {quote.overBuckets > 0 && (
+                          <div style={{ display:"flex", justifyContent:"space-between", fontSize:13, color:"#475569", padding:"8px 0", borderBottom:"1px solid #f1f5f9" }}>
+                            <span>Extra conversations ({(quote.overBuckets * 1000).toLocaleString()} over, {quote.overBuckets} × {fmt(quote.tier.extraPer1k)}/1,000)</span>
+                            <span style={{ fontWeight:700, color:"#0f172a" }}>{fmt(quote.extraCost)}</span>
+                          </div>
+                        )}
+                        {quote.extraConns > 0 && (
+                          <div style={{ display:"flex", justifyContent:"space-between", fontSize:13, color:"#475569", padding:"8px 0", borderBottom:"1px solid #f1f5f9" }}>
+                            <span>Additional connections ({quote.extraConns} × $3,500/year)</span>
+                            <span style={{ fontWeight:700, color:"#0f172a" }}>{fmt(quote.connCost)}</span>
+                          </div>
+                        )}
+                        <div style={{ display:"flex", justifyContent:"space-between", fontSize:14, fontWeight:800, color:"#0f172a", padding:"8px 0" }}>
+                          <span>Annual total</span>
+                          <span>{fmt(quote.total)}</span>
+                        </div>
+                      </div>
+
+                      {/* How we calculated this */}
+                      <div style={{ borderTop:"1px solid #f1f5f9", paddingTop:12 }}>
+                        <div style={{ fontSize:10, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:0.5, marginBottom:6 }}>How we calculated this</div>
+                        <p style={{ fontSize:11, color:"#94a3b8", margin:0, lineHeight:1.7 }}>
+                          Based on {investConversations.toLocaleString()} annual conversations, the <strong>{quote.tier.name}</strong> plan ({fmt(quote.tier.monthly)}/month, includes {quote.tier.included.toLocaleString()} conversations and {quote.tier.includedConns} connection{quote.tier.includedConns > 1 ? "s" : ""}) is the most cost-effective option.
+                          {quote.overBuckets > 0 && ` You are ${(quote.overBuckets * 1000).toLocaleString()} conversations over the included allowance, billed in blocks of 1,000 at ${fmt(quote.tier.extraPer1k)} each.`}
+                          {quote.extraConns > 0 && ` You have selected ${investDataSources.length} data source${investDataSources.length !== 1 ? "s" : ""}; ${quote.tier.includedConns} connection${quote.tier.includedConns > 1 ? " is" : " is"} included in the plan and ${quote.extraConns} additional connection${quote.extraConns !== 1 ? "s are" : " is"} billed at $3,500/year each.`}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+            );
+          })()}
 
           {/* Footer CTA */}
           <div style={{ background:"#0f172a", borderRadius:20, padding:"40px 48px", position:"relative", overflow:"hidden" }}>

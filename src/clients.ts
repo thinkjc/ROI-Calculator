@@ -3,6 +3,7 @@ export type ClientConfig = {
   logoUrl?: string;
   locale: 'en-GB' | 'en-US';
   defaultCurrency: 'GBP' | 'EUR' | 'USD' | 'JPY';
+  showInvestmentOverview?: boolean;
 };
 
 // Keys are GUIDs — never use client names as keys.

@@ -15,12 +15,12 @@ export default async function handler(req: Request, res: Response) {
       return res.status(200).json(clients);
     }
     if (req.method === 'POST') {
-      const { name, logoUrl, locale, defaultCurrency } = req.body;
+      const { name, logoUrl, locale, defaultCurrency, showInvestmentOverview } = req.body;
       if (!name || !locale || !defaultCurrency) {
         return res.status(400).json({ error: 'name, locale, and defaultCurrency are required' });
       }
       const id = randomUUID();
-      clients[id] = { name, logoUrl: logoUrl || undefined, locale, defaultCurrency };
+      clients[id] = { name, logoUrl: logoUrl || undefined, locale, defaultCurrency, showInvestmentOverview: !!showInvestmentOverview };
       await redis.set('roi:clients', clients);
       return res.status(201).json({ id, ...clients[id] });
     }
