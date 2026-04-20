@@ -549,7 +549,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get('s');
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('s') ?? window.location.pathname.match(/^\/s\/([^/?]+)/)?.[1];
     if (!id) return;
     fetch(`/api/load/${id}`)
       .then(r => r.json())
