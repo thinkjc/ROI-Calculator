@@ -594,7 +594,11 @@ export default function App() {
       });
       if (!res.ok) throw new Error('Save failed');
       const { id } = await res.json();
-      await navigator.clipboard.writeText(`${window.location.origin}/s/${id}`);
+      const clientId = new URLSearchParams(window.location.search).get('c');
+      const shareUrl = clientId
+        ? `${window.location.origin}/s/${id}?c=${clientId}`
+        : `${window.location.origin}/s/${id}`;
+      await navigator.clipboard.writeText(shareUrl);
       setShareStatus('copied');
       setTimeout(() => setShareStatus('idle'), 3000);
     } catch {
@@ -625,15 +629,20 @@ export default function App() {
       {/* Mobile Header */}
       <div className="mobile-header" style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 16px", background:"#fff", borderBottom:"1px solid #e2e8f0", position:"sticky", top:0, zIndex:50 }}>
         <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-          <div style={{ width:32, height:32, background:"#0f172a", borderRadius:6, display:"flex", alignItems:"center", justifyContent:"center" }}>
-            <TrendingUp size={16} color="#fff"/>
-          </div>
-          <span style={{ fontWeight:800, color:"#0f172a" }}>ROI Engine</span>
+          {client ? (
+            client.logoUrl
+              ? <img src={client.logoUrl} alt={client.name} style={{ height:28, maxWidth:120, objectFit:"contain" }}/>
+              : <span style={{ fontWeight:800, color:"#0f172a" }}>{client.name}</span>
+          ) : (
+            <>
+              <div style={{ width:32, height:32, background:"#0f172a", borderRadius:6, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <TrendingUp size={16} color="#fff"/>
+              </div>
+              <span style={{ fontWeight:800, color:"#0f172a" }}>ROI Engine</span>
+            </>
+          )}
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-          {client?.logoUrl && (
-            <img src={client.logoUrl} alt={client.name} style={{ height:24, maxWidth:80, objectFit:"contain" }}/>
-          )}
           <button onClick={() => setMobileOpen(!mobileOpen)} style={{ background:"none", border:"none", cursor:"pointer", padding:4 }}>
             {mobileOpen ? <X size={24}/> : <Menu size={24}/>}
           </button>
@@ -644,19 +653,19 @@ export default function App() {
         {/* Sidebar */}
         <aside className="sidebar" style={{ display: mobileOpen ? "flex" : "none", flexDirection:"column", width:260, minWidth:260, background:"#fff", borderRight:"1px solid #e2e8f0", position:"sticky", top:0, height:"100vh", overflowY:"auto", zIndex:40 }}>
           <div style={{ padding:"24px 20px 16px" }}>
-            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom: client ? 12 : 28 }}>
-              <div style={{ width:32, height:32, background:"#0f172a", borderRadius:6, display:"flex", alignItems:"center", justifyContent:"center" }}>
-                <TrendingUp size={16} color="#fff"/>
-              </div>
-              <span style={{ fontWeight:800, fontSize:18, color:"#0f172a" }}>ROI Engine</span>
-            </div>
-            {client && (
-              <div style={{ marginBottom:20, paddingBottom:16, borderBottom:"1px solid #f1f5f9" }}>
-                <div style={{ fontSize:9, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:1, marginBottom:6 }}>Prepared for</div>
+            {client ? (
+              <div style={{ marginBottom:28, paddingBottom:20, borderBottom:"1px solid #f1f5f9" }}>
                 {client.logoUrl
-                  ? <img src={client.logoUrl} alt={client.name} style={{ height:28, maxWidth:110, objectFit:"contain", objectPosition:"left center" }}/>
-                  : <div style={{ fontSize:14, fontWeight:700, color:"#0f172a" }}>{client.name}</div>
+                  ? <img src={client.logoUrl} alt={client.name} style={{ height:36, maxWidth:140, objectFit:"contain", objectPosition:"left center" }}/>
+                  : <div style={{ fontWeight:800, fontSize:18, color:"#0f172a" }}>{client.name}</div>
                 }
+              </div>
+            ) : (
+              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:28 }}>
+                <div style={{ width:32, height:32, background:"#0f172a", borderRadius:6, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  <TrendingUp size={16} color="#fff"/>
+                </div>
+                <span style={{ fontWeight:800, fontSize:18, color:"#0f172a" }}>ROI Engine</span>
               </div>
             )}
 
@@ -710,7 +719,7 @@ export default function App() {
                 value={benchmarkUrl}
                 onChange={(e: { target: HTMLInputElement }) => { setBenchmarkUrl(e.target.value); if (benchmarkStatus !== 'idle') setBenchmarkStatus('idle'); }}
                 onKeyDown={(e: { key: string }) => e.key === 'Enter' && generateBenchmarks()}
-                placeholder="e.g. vodafone.com or https://yourcompany.com"
+                placeholder="e.g. https://yourcompany.com"
                 style={{ flex:1, padding:"9px 12px", border:"1px solid #c4b5fd", borderRadius:8, fontSize:13, color:"#0f172a", background:"#fff", outline:"none" }}
               />
               <button

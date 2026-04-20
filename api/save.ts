@@ -1,8 +1,6 @@
 import { Redis } from '@upstash/redis';
 import type { Request, Response } from 'express';
 
-const redis = Redis.fromEnv();
-
 function generateId(): string {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
   let id = '';
@@ -17,6 +15,7 @@ export default async function handler(req: Request, res: Response) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
   try {
+    const redis = Redis.fromEnv();
     const { globalValues, currency, subCost } = req.body;
     let id = generateId();
     for (let i = 0; i < 5; i++) {
