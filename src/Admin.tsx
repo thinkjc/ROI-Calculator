@@ -19,7 +19,7 @@ type FormState = {
   showInvestmentOverview: boolean;
 };
 
-const emptyForm: FormState = { name: '', domain: '', logoUrl: '', locale: 'en-GB', defaultCurrency: 'GBP', showInvestmentOverview: false };
+const emptyForm: FormState = { name: '', domain: '', logoUrl: '', locale: 'en-GB', defaultCurrency: 'GBP', showInvestmentOverview: true };
 
 // Tests candidate URLs in parallel, returns first 3 that load successfully.
 function findLogos(domain: string): Promise<string[]> {
