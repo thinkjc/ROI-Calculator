@@ -576,7 +576,7 @@ export default function App() {
     };
     fetch(`/api/client?c=${guid}`)
       .then(r => r.ok ? r.json() : null)
-      .then(data => apply(data ?? getClient(guid)))
+      .then(data => { console.log('[client data from API]', data); apply(data ?? getClient(guid)); })
       .catch(() => apply(getClient(guid)));
   }, []);
 

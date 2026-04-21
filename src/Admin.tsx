@@ -97,6 +97,7 @@ export default function Admin({ adminKey }: { adminKey: string }) {
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveToast, setSaveToast] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const domainTimeout = useRef<ReturnType<typeof setTimeout>>();
@@ -194,11 +195,15 @@ export default function Admin({ adminKey }: { adminKey: string }) {
         const { ok, status, data } = await parseResponse(r);
         if (!ok) throw new Error(data?.error ?? `Server error (${status})`);
         setClients(cs => cs.map(c => c.id === editing ? { id: editing, ...data } : c));
+        setSaveToast(editing);
+        setTimeout(() => setSaveToast(null), 4000);
       } else {
         const r = await fetch('/api/admin/clients', { method: 'POST', headers, body: JSON.stringify(payload) });
         const { ok, status, data } = await parseResponse(r);
         if (!ok) throw new Error(data?.error ?? `Server error (${status})`);
         setClients(cs => [...cs, data]);
+        setSaveToast(data.id);
+        setTimeout(() => setSaveToast(null), 4000);
       }
       closeForm();
     } catch (err) {
@@ -282,7 +287,7 @@ export default function Admin({ adminKey }: { adminKey: string }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {clients.map(c => (
-              <div key={c.id} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '18px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div key={c.id} style={{ background: saveToast === c.id ? '#f0fdf4' : '#fff', border: `1px solid ${saveToast === c.id ? '#86efac' : '#e2e8f0'}`, borderRadius: 12, padding: '18px 24px', display: 'flex', alignItems: 'center', gap: 16, transition: 'background 0.3s, border-color 0.3s' }}>
                 <div style={{ width: 44, height: 44, borderRadius: 8, border: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
                   {c.logoUrl
                     ? <img src={c.logoUrl} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }} />
@@ -296,6 +301,12 @@ export default function Admin({ adminKey }: { adminKey: string }) {
                       {c.locale === 'en-GB' ? 'British English' : 'American English'}
                     </span>
                     <span style={{ fontSize: 11, fontWeight: 600, color: '#475569', background: '#f1f5f9', padding: '2px 8px', borderRadius: 999 }}>{c.defaultCurrency}</span>
+                    {c.showInvestmentOverview && (
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#059669', background: '#f0fdf4', padding: '2px 8px', borderRadius: 999, border: '1px solid #bbf7d0' }}>Investment Overview ✓</span>
+                    )}
+                    {saveToast === c.id && (
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#059669' }}>✓ Saved!</span>
+                    )}
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '7px 10px', fontSize: 12, color: '#64748b', fontFamily: 'monospace', maxWidth: 320, flexShrink: 1, minWidth: 0 }}>
