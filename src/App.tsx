@@ -514,6 +514,11 @@ export default function App() {
   const [investDataSources, setInvestDataSources] = useState<string[]>([]);
   const [quoteVisible, setQuoteVisible] = useState(false);
 
+  const quote = useMemo(() => calcQuote(investConversations, investDataSources), [investConversations, investDataSources]);
+  const fmtInvest = (n: number) => '$' + n.toLocaleString('en-US');
+  const toggleInvestSource = (s: string) =>
+    setInvestDataSources(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
+
   const handleValueChange = (cardId, inputId, value) => {
     setGlobalValues(prev => ({ ...prev, [cardId]: { ...(prev[cardId]||{}), [inputId]: value } }));
   };
@@ -895,12 +900,7 @@ export default function App() {
           ))}
 
           {/* Investment Overview */}
-          {client?.showInvestmentOverview && (() => {
-            const quote = calcQuote(investConversations, investDataSources);
-            const fmt = (n: number) => '$' + n.toLocaleString('en-US');
-            const toggleSource = (s: string) =>
-              setInvestDataSources(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
-            return (
+          {client?.showInvestmentOverview && (
               <section id="investment" style={{ marginBottom:80, scrollMarginTop:80 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:16, marginBottom:8 }}>
                   <Calculator size={32} color="#10b981"/>
@@ -937,7 +937,7 @@ export default function App() {
                       {DATA_SOURCES.map(src => {
                         const on = investDataSources.includes(src);
                         return (
-                          <button key={src} onClick={() => { toggleSource(src); setQuoteVisible(false); }}
+                          <button key={src} onClick={() => { toggleInvestSource(src); setQuoteVisible(false); }}
                             style={{ padding:"6px 12px", borderRadius:999, fontSize:12, fontWeight:600, cursor:"pointer", transition:"all 0.15s", border: on ? "2px solid #10b981" : "1.5px solid #e2e8f0", background: on ? "#f0fdf4" : "#f8fafc", color: on ? "#059669" : "#475569" }}>
                             {on ? "✓ " : ""}{src}
                           </button>
@@ -960,30 +960,30 @@ export default function App() {
                     <div>
                       <div style={{ background:"linear-gradient(135deg,#f0fdf4,#dcfce7)", border:"1px solid #86efac", borderRadius:12, padding:"20px 24px", marginBottom:16 }}>
                         <div style={{ fontSize:11, fontWeight:700, color:"#15803d", textTransform:"uppercase", letterSpacing:1, marginBottom:4 }}>Estimated Annual Investment</div>
-                        <div style={{ fontSize:40, fontWeight:800, color:"#0f172a", letterSpacing:-1 }}>{fmt(quote.total)}</div>
-                        <div style={{ fontSize:12, color:"#64748b", marginTop:4 }}>{quote.tier.name} Plan · {fmt(quote.tier.monthly)}/month</div>
+                        <div style={{ fontSize:40, fontWeight:800, color:"#0f172a", letterSpacing:-1 }}>{fmtInvest(quote.total)}</div>
+                        <div style={{ fontSize:12, color:"#64748b", marginTop:4 }}>{quote.tier.name} Plan · {fmtInvest(quote.tier.monthly)}/month</div>
                       </div>
 
                       <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:16 }}>
                         <div style={{ display:"flex", justifyContent:"space-between", fontSize:13, color:"#475569", padding:"8px 0", borderBottom:"1px solid #f1f5f9" }}>
                           <span>{quote.tier.name} plan base ({quote.tier.included.toLocaleString()} conversations, {quote.tier.includedConns} connection{quote.tier.includedConns > 1 ? "s" : ""} included)</span>
-                          <span style={{ fontWeight:700, color:"#0f172a" }}>{fmt(quote.base)}</span>
+                          <span style={{ fontWeight:700, color:"#0f172a" }}>{fmtInvest(quote.base)}</span>
                         </div>
                         {quote.overBuckets > 0 && (
                           <div style={{ display:"flex", justifyContent:"space-between", fontSize:13, color:"#475569", padding:"8px 0", borderBottom:"1px solid #f1f5f9" }}>
-                            <span>Extra conversations ({(quote.overBuckets * 1000).toLocaleString()} over, {quote.overBuckets} × {fmt(quote.tier.extraPer1k)}/1,000)</span>
-                            <span style={{ fontWeight:700, color:"#0f172a" }}>{fmt(quote.extraCost)}</span>
+                            <span>Extra conversations ({(quote.overBuckets * 1000).toLocaleString()} over, {quote.overBuckets} × {fmtInvest(quote.tier.extraPer1k)}/1,000)</span>
+                            <span style={{ fontWeight:700, color:"#0f172a" }}>{fmtInvest(quote.extraCost)}</span>
                           </div>
                         )}
                         {quote.extraConns > 0 && (
                           <div style={{ display:"flex", justifyContent:"space-between", fontSize:13, color:"#475569", padding:"8px 0", borderBottom:"1px solid #f1f5f9" }}>
                             <span>Additional connections ({quote.extraConns} × $3,500/year)</span>
-                            <span style={{ fontWeight:700, color:"#0f172a" }}>{fmt(quote.connCost)}</span>
+                            <span style={{ fontWeight:700, color:"#0f172a" }}>{fmtInvest(quote.connCost)}</span>
                           </div>
                         )}
                         <div style={{ display:"flex", justifyContent:"space-between", fontSize:14, fontWeight:800, color:"#0f172a", padding:"8px 0" }}>
                           <span>Annual total</span>
-                          <span>{fmt(quote.total)}</span>
+                          <span>{fmtInvest(quote.total)}</span>
                         </div>
                       </div>
 
@@ -991,8 +991,8 @@ export default function App() {
                       <div style={{ borderTop:"1px solid #f1f5f9", paddingTop:12 }}>
                         <div style={{ fontSize:10, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:0.5, marginBottom:6 }}>How we calculated this</div>
                         <p style={{ fontSize:11, color:"#94a3b8", margin:0, lineHeight:1.7 }}>
-                          Based on {investConversations.toLocaleString()} annual conversations, the <strong>{quote.tier.name}</strong> plan ({fmt(quote.tier.monthly)}/month, includes {quote.tier.included.toLocaleString()} conversations and {quote.tier.includedConns} connection{quote.tier.includedConns > 1 ? "s" : ""}) is the most cost-effective option.
-                          {quote.overBuckets > 0 && ` You are ${(quote.overBuckets * 1000).toLocaleString()} conversations over the included allowance, billed in blocks of 1,000 at ${fmt(quote.tier.extraPer1k)} each.`}
+                          Based on {investConversations.toLocaleString()} annual conversations, the <strong>{quote.tier.name}</strong> plan ({fmtInvest(quote.tier.monthly)}/month, includes {quote.tier.included.toLocaleString()} conversations and {quote.tier.includedConns} connection{quote.tier.includedConns > 1 ? "s" : ""}) is the most cost-effective option.
+                          {quote.overBuckets > 0 && ` You are ${(quote.overBuckets * 1000).toLocaleString()} conversations over the included allowance, billed in blocks of 1,000 at ${fmtInvest(quote.tier.extraPer1k)} each.`}
                           {quote.extraConns > 0 && ` You have selected ${investDataSources.length} data source${investDataSources.length !== 1 ? "s" : ""}; ${quote.tier.includedConns} connection${quote.tier.includedConns > 1 ? " is" : " is"} included in the plan and ${quote.extraConns} additional connection${quote.extraConns !== 1 ? "s are" : " is"} billed at $3,500/year each.`}
                         </p>
                       </div>
@@ -1000,8 +1000,7 @@ export default function App() {
                   )}
                 </div>
               </section>
-            );
-          })()}
+          )}
 
           {/* Footer CTA */}
           <div style={{ background:"#0f172a", borderRadius:20, padding:"40px 48px", position:"relative", overflow:"hidden" }}>
