@@ -98,6 +98,7 @@ export default function Admin({ adminKey }: { adminKey: string }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveToast, setSaveToast] = useState<string | null>(null);
+  const [verifyStatus, setVerifyStatus] = useState<Record<string, 'ok' | 'fail'>>({});
   const [copied, setCopied] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const domainTimeout = useRef<ReturnType<typeof setTimeout>>();
@@ -190,6 +191,10 @@ export default function Admin({ adminKey }: { adminKey: string }) {
         try { return { ok: r.ok, status: r.status, data: JSON.parse(text) }; }
         catch { return { ok: r.ok, status: r.status, data: null }; }
       };
+      const verify = async (id: string) => {
+        const vr = await fetch(`/api/client?c=${id}`);
+        setVerifyStatus(s => ({ ...s, [id]: vr.ok ? 'ok' : 'fail' }));
+      };
       if (editing) {
         const r = await fetch(`/api/admin/clients/${editing}`, { method: 'PUT', headers, body: JSON.stringify(payload) });
         const { ok, status, data } = await parseResponse(r);
@@ -197,6 +202,7 @@ export default function Admin({ adminKey }: { adminKey: string }) {
         setClients(cs => cs.map(c => c.id === editing ? { id: editing, ...data } : c));
         setSaveToast(editing);
         setTimeout(() => setSaveToast(null), 4000);
+        verify(editing);
       } else {
         const r = await fetch('/api/admin/clients', { method: 'POST', headers, body: JSON.stringify(payload) });
         const { ok, status, data } = await parseResponse(r);
@@ -204,6 +210,7 @@ export default function Admin({ adminKey }: { adminKey: string }) {
         setClients(cs => [...cs, data]);
         setSaveToast(data.id);
         setTimeout(() => setSaveToast(null), 4000);
+        verify(data.id);
       }
       closeForm();
     } catch (err) {
@@ -306,6 +313,12 @@ export default function Admin({ adminKey }: { adminKey: string }) {
                     )}
                     {saveToast === c.id && (
                       <span style={{ fontSize: 11, fontWeight: 700, color: '#059669' }}>✓ Saved!</span>
+                    )}
+                    {verifyStatus[c.id] === 'ok' && (
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#059669' }}>✓ API reachable</span>
+                    )}
+                    {verifyStatus[c.id] === 'fail' && (
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#dc2626' }}>✗ API unreachable — check Redis env vars</span>
                     )}
                   </div>
                 </div>

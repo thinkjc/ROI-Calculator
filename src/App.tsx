@@ -507,6 +507,7 @@ export default function App() {
   const [subCost, setSubCost] = useState(0);
   const [shareStatus, setShareStatus] = useState<'idle' | 'saving' | 'copied' | 'error'>('idle');
   const [client, setClient] = useState<ClientConfig | null>(null);
+  const [clientId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('c'));
   const [benchmarkUrl, setBenchmarkUrl] = useState('');
   const [benchmarkStatus, setBenchmarkStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [benchmarkError, setBenchmarkError] = useState('');
@@ -715,7 +716,7 @@ export default function App() {
                 {activeSection===s.id && <ChevronRight size={12} color="#94a3b8" style={{ marginLeft:"auto" }}/>}
               </button>
             ))}
-            {(client && (client.showInvestmentOverview ?? true)) && (
+            {clientId && (
               <>
                 <div style={{ fontSize:10, fontWeight:800, color:"#64748b", textTransform:"uppercase", letterSpacing:1.5, marginBottom:8, paddingLeft:4, marginTop:12 }}>Pricing</div>
                 <button className={`nav-btn ${activeSection==="investment"?"active":""}`} onClick={() => scrollTo("investment")} style={{ color: activeSection==="investment"?"#0f172a":"#64748b" }}>
@@ -900,7 +901,7 @@ export default function App() {
           ))}
 
           {/* Investment Overview */}
-          {(client && (client.showInvestmentOverview ?? true)) && (
+          {clientId && (
               <section id="investment" style={{ marginBottom:80, scrollMarginTop:80 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:16, marginBottom:8 }}>
                   <Calculator size={32} color="#10b981"/>
