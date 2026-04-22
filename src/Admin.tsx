@@ -98,7 +98,7 @@ export default function Admin({ adminKey }: { adminKey: string }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveToast, setSaveToast] = useState<string | null>(null);
-  const [verifyStatus, setVerifyStatus] = useState<Record<string, 'ok' | 'fail'>>({});
+  const [verifyStatus, setVerifyStatus] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const domainTimeout = useRef<ReturnType<typeof setTimeout>>();
@@ -192,8 +192,11 @@ export default function Admin({ adminKey }: { adminKey: string }) {
         catch { return { ok: r.ok, status: r.status, data: null }; }
       };
       const verify = async (id: string) => {
+        await new Promise(r => setTimeout(r, 800));
         const vr = await fetch(`/api/client?c=${id}`);
-        setVerifyStatus(s => ({ ...s, [id]: vr.ok ? 'ok' : 'fail' }));
+        const vrText = await vr.text();
+        console.log(`[verify ${id}] status=${vr.status}`, vrText);
+        setVerifyStatus(s => ({ ...s, [id]: vr.ok ? 'ok' : `fail:${vr.status}` as any }));
       };
       if (editing) {
         const r = await fetch(`/api/admin/clients/${editing}`, { method: 'PUT', headers, body: JSON.stringify(payload) });
@@ -317,8 +320,8 @@ export default function Admin({ adminKey }: { adminKey: string }) {
                     {verifyStatus[c.id] === 'ok' && (
                       <span style={{ fontSize: 11, fontWeight: 700, color: '#059669' }}>✓ API reachable</span>
                     )}
-                    {verifyStatus[c.id] === 'fail' && (
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#dc2626' }}>✗ API unreachable — check Redis env vars</span>
+                    {verifyStatus[c.id] && verifyStatus[c.id] !== 'ok' && (
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#dc2626' }}>✗ API error {(verifyStatus[c.id] as string).replace('fail:', '')} — {(verifyStatus[c.id] as string).includes('404') ? 'client not saved to Redis' : 'check Redis env vars in Vercel'}</span>
                     )}
                   </div>
                 </div>
