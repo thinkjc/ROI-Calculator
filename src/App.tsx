@@ -14,7 +14,7 @@ import Admin from "./Admin";
 
 const DATA_SOURCES = [
   'Databricks','Genesys','Gorgias','Hubspot','Intercom',
-  'Microsoft Dynamics','Quo','Salesforce','Snowflake','Zendesk','Zoom','Other',
+  'Microsoft Dynamics','Quo','Salesforce','Snowflake','UJET','Zendesk','Zoom','Other',
 ];
 
 const TIERS = [
@@ -685,7 +685,7 @@ export default function App() {
 
       <div className="layout" style={{ display:"flex", flexDirection:"column", flex:1 }}>
         {/* Sidebar */}
-        <aside className="sidebar" style={{ display: mobileOpen ? "flex" : "none", flexDirection:"column", width:260, minWidth:260, background:"#fff", borderRight:"1px solid #e2e8f0", position:"sticky", top:0, height:"100vh", overflowY:"auto", zIndex:40 }}>
+        <aside className="sidebar" style={{ display: mobileOpen ? "flex" : "none", flexDirection:"column", width:290, minWidth:290, background:"#fff", borderRight:"1px solid #e2e8f0", position:"sticky", top:0, height:"100vh", overflowY:"auto", zIndex:40 }}>
           <div style={{ padding:"24px 20px 16px" }}>
             {client ? (
               <div style={{ marginBottom:28, paddingBottom:20, borderBottom:"1px solid #f1f5f9" }}>
@@ -921,12 +921,12 @@ export default function App() {
                       />
                     </div>
                     <p style={{ fontSize:11, color:"#94a3b8", margin:"0 0 8px" }}>Total tickets, transcripts, or chat interactions per year</p>
-                    <input type="range" min={0} max={500000} step={1000} value={investConversations}
+                    <input type="range" min={0} max={2000000} step={1000} value={investConversations}
                       onChange={e => { setInvestConversations(Number(e.target.value)); setQuoteVisible(false); }}
-                      style={{ width:"100%", height:6, borderRadius:9999, appearance:"none", cursor:"pointer", background:`linear-gradient(to right,#10b981 0%,#10b981 ${(investConversations/500000)*100}%,#e2e8f0 ${(investConversations/500000)*100}%,#e2e8f0 100%)` }}
+                      style={{ width:"100%", height:6, borderRadius:9999, appearance:"none", cursor:"pointer", background:`linear-gradient(to right,#10b981 0%,#10b981 ${(investConversations/2000000)*100}%,#e2e8f0 ${(investConversations/2000000)*100}%,#e2e8f0 100%)` }}
                     />
                     <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:"#94a3b8", marginTop:4 }}>
-                      <span>0</span><span>500,000</span>
+                      <span>0</span><span>2,000,000</span>
                     </div>
                   </div>
 
@@ -951,7 +951,7 @@ export default function App() {
                   </div>
 
                   {/* Get a Quote */}
-                  <button onClick={() => setQuoteVisible(true)}
+                  <button onClick={() => { setQuoteVisible(true); setSubCost(calcQuote(investConversations, investDataSources).total); }}
                     style={{ width:"100%", padding:13, background:"#10b981", color:"#fff", border:"none", borderRadius:8, fontSize:14, fontWeight:700, cursor:"pointer", marginBottom: quoteVisible ? 24 : 0 }}>
                     Get a Quote
                   </button>
@@ -1008,7 +1008,7 @@ export default function App() {
             <div style={{ position:"relative", zIndex:1 }}>
               <h2 style={{ fontSize:28, fontWeight:800, color:"#fff", marginBottom:12 }}>{localise("Ready to realise this value?", locale)}</h2>
               <p style={{ color:"#94a3b8", maxWidth:460, lineHeight:1.7, marginBottom:24 }}>Our platform helps {client ? client.name : "enterprise teams"} capture the 3-year value estimated above — typically within 30 days of going live.</p>
-              <a href="https://cxconnect.ai" target="_blank" rel="noopener noreferrer"
+              <a href="https://cxconnect.ai/contact" target="_blank" rel="noopener noreferrer"
                 style={{ display:"inline-block", padding:"12px 24px", background:"#fff", color:"#0f172a", fontWeight:700, borderRadius:10, textDecoration:"none", fontSize:14 }}>
                 Get in touch
               </a>
